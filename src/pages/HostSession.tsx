@@ -24,59 +24,93 @@ export default function HostSession() {
       return
     }
 
-    const ws = new WebSocket(api.getWebSocketUrl(code))
-    wsRef.current = ws
+    let ws: WebSocket | null = null
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 5
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
 
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'identify_host', hostToken }))
-    }
+    const connect = () => {
+      ws = new WebSocket(api.getWebSocketUrl(code))
+      wsRef.current = ws
 
-    ws.onmessage = (event) => {
-      const msg: ServerMessage = JSON.parse(event.data)
-      
-      switch (msg.type) {
-        case 'session_state':
-          setSession(msg.state)
-          break
-        case 'player_joined':
-          setSession(prev => prev ? {
-            ...prev,
-            players: [...prev.players, msg.player]
-          } : null)
-          break
-        case 'player_left':
-          setSession(prev => prev ? {
-            ...prev,
-            players: prev.players.filter(p => p.id !== msg.playerId)
-          } : null)
-          break
-        case 'question_started':
-          setSession(prev => prev ? {
-            ...prev,
-            status: 'playing',
-            currentQuestionIndex: msg.questionIndex
-          } : null)
-          break
-        case 'revealed':
-          setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
-          setResults(msg.results)
-          break
-        case 'error':
-          setError(msg.message)
-          break
+      ws.onopen = () => {
+        reconnectAttempts = 0
+        setError(null)
+        ws?.send(JSON.stringify({ type: 'identify_host', hostToken }))
+      }
+
+      ws.onmessage = (event) => {
+        const msg: ServerMessage = JSON.parse(event.data)
+        
+        switch (msg.type) {
+          case 'session_state':
+            setSession(msg.state)
+            break
+          case 'player_joined':
+            setSession(prev => prev ? {
+              ...prev,
+              players: [...prev.players, msg.player]
+            } : null)
+            break
+          case 'player_left':
+            setSession(prev => prev ? {
+              ...prev,
+              players: prev.players.filter(p => p.id !== msg.playerId)
+            } : null)
+            break
+          case 'answer_received':
+            // Update the player's answers in state
+            setSession(prev => {
+              if (!prev) return null
+              return {
+                ...prev,
+                players: prev.players.map(p => 
+                  p.id === msg.playerId 
+                    ? { ...p, answers: { ...p.answers, [msg.questionIndex]: -1 } } // -1 as placeholder, we don't know the actual answer
+                    : p
+                )
+              }
+            })
+            break
+          case 'question_started':
+            setSession(prev => prev ? {
+              ...prev,
+              status: 'playing',
+              currentQuestionIndex: msg.questionIndex
+            } : null)
+            break
+          case 'revealed':
+            setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
+            setResults(msg.results)
+            break
+          case 'error':
+            setError(msg.message)
+            break
+        }
+      }
+
+      ws.onerror = () => {
+        // Error will trigger onclose
+      }
+
+      ws.onclose = () => {
+        wsRef.current = null
+        if (reconnectAttempts < maxReconnectAttempts) {
+          reconnectAttempts++
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
+          setError(`Connection lost. Reconnecting in ${delay/1000}s...`)
+          reconnectTimeout = setTimeout(connect, delay)
+        } else {
+          setError('Connection lost. Please refresh the page.')
+        }
       }
     }
 
-    ws.onerror = () => {
-      setError('Connection error')
-    }
-
-    ws.onclose = () => {
-      console.log('WebSocket closed')
-    }
+    connect()
 
     return () => {
-      ws.close()
+      if (reconnectTimeout) clearTimeout(reconnectTimeout)
+      ws?.close()
     }
   }, [code, hostToken, config.apiBaseUrl])
 

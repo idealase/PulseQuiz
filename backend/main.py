@@ -56,7 +56,7 @@ class AnswerRequest(BaseModel):
 
 # --- Helper Functions ---
 
-async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None):
+async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None, host_only: bool = False):
     """Broadcast a message to all connections in a session"""
     if code not in ws_connections:
         return
@@ -65,6 +65,11 @@ async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[st
     for conn_id, (ws, role, identifier) in ws_connections[code].items():
         if conn_id == exclude_id:
             continue
+        
+        # Skip players if host_only is True
+        if host_only and role != 'host':
+            continue
+            
         try:
             # Personalize reveal results for players
             if message.get('type') == 'revealed' and role == 'player':
@@ -263,12 +268,12 @@ async def submit_answer(code: str, request: AnswerRequest):
     
     player.answers[request.questionIndex] = request.choice
     
-    # Notify host that someone answered (without revealing the answer)
+    # Notify host only that someone answered (without revealing the answer)
     await broadcast_to_session(code, {
         'type': 'answer_received',
         'playerId': request.playerId,
         'questionIndex': request.questionIndex
-    })
+    }, host_only=True)
     
     return {"ok": True}
 
