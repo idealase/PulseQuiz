@@ -1,0 +1,71 @@
+Question;Correct answer;Wrong answer 1;Wrong answer 2;Wrong answer 3
+What architectural pattern stores immutable events as the source of truth?;Event sourcing;CQRS;Lambda architecture;Write-Only Living
+What Australian city hosts the Melbourne Cup?;Melbourne;Sydney;Flemington;Horsetown
+What metric penalises large forecast errors more heavily?;Root Mean Squared Error;Mean Absolute Error;Mean Squared Error;Big Error Panic
+Who released the 2024 album Cowboy Carter?;Beyoncé;Taylor Swift;Dolly Parton;Yeehawoncé
+What professional services firm is one of the Big Four?;Deloitte;Accenture;McKinsey;Big Accounty Co
+What does RAG stand for in LLM systems?;Retrieval-Augmented Generation;Reinforced Auto Generation;Recurrent Attention Graph;Really Accurate Guessing
+What Australian animal appears on the one dollar coin?;Kangaroo;Emu;Koala;Drop Bear
+Who wrote 1984?;George Orwell;Aldous Huxley;Ray Bradbury;Big Brother
+What bias leads people to over-trust automated systems?;Automation bias;Confirmation bias;Overfitting;Robot Worship
+What gas primarily drives the greenhouse effect?;Carbon dioxide;Oxygen;Nitrogen;Bad Air
+What document governs ethical conduct in consulting firms?;Code of conduct;Statement of work;Service catalogue;Vibe Charter
+What Australian body manages monetary policy?;Reserve Bank of Australia;Treasury;ASIC;Money Wizards
+What file format underpins Delta Lake storage?;Apache Parquet;CSV;JSON;Delta.xls
+What band released OK Computer?;Radiohead;Coldplay;Muse;The Computers
+What billing model charges by time worked?;Time and materials;Fixed price;Value based pricing;Clock Farming
+What Australian writer authored Cloudstreet?;Tim Winton;Peter Carey;Patrick White;Steve Irwin
+What similarity metric is most common for embeddings?;Cosine similarity;Euclidean distance;Dot product;Goodness Score
+What 2024 global event dominated news coverage?;United States election cycle;FIFA World Cup;Olympics;Everyone Arguing
+Who proposed the theory of natural selection?;Charles Darwin;Gregor Mendel;Isaac Newton;Monkey Guy
+What deployment pattern exposes a small fraction of users first?;Canary deployment;Blue-green deployment;Rolling deployment;Sacrifice Release
+What Australian state is abbreviated WA?;Western Australia;South Australia;Northern Territory;West Atlantis
+What novel begins with “Call me Ishmael”?;Moby-Dick;The Old Man and the Sea;Heart of Darkness;Whale Time
+What document defines scope and deliverables?;Statement of Work;Code of ethics;Timesheet;Pinky Promise
+What process ensures ML models perform post-deployment?;Model monitoring;Training;Prompt tuning;Watching Nervously
+What Australian holiday occurs on January 26?;Australia Day;ANZAC Day;Labour Day;BBQ Day
+Who released the album Future Nostalgia?;Dua Lipa;Lady Gaga;Charli XCX;Disco Bot
+What paradox hides trends in aggregates?;Simpson’s paradox;Survivorship bias;Regression to the mean;Math Gaslighting
+What current trend drives global rate volatility?;Inflation;Cryptocurrency;Remote work;Vibes
+What animal appears on Australia’s coat of arms?;Emu;Platypus;Dingo;Magpie Judge
+What LLM failure involves fabricated citations?;Hallucination;Overfitting;Bias;Creative Confidence
+What genre is Sapiens?;Popular science;Historical fiction;Philosophy;Cave Memoir
+What obligation prevents sharing client data?;Confidentiality;Transparency;Portability;Pinky Lock
+What city hosted the 2000 Olympics?;Sydney;Melbourne;Brisbane;Olympicland
+What pattern separates read and write models?;CQRS;Event sourcing;Star schema;Ready-Writey
+Who released 1989 (Taylor’s Version)?;Taylor Swift;Olivia Rodrigo;Lana Del Rey;Taylor Original
+Who wrote True History of the Kelly Gang?;Peter Carey;Tim Winton;Christos Tsiolkas;Ned Kelly Himself
+What occurs when model inputs change over time?;Data drift;Overfitting;Leakage;Model Aging
+What science studies the nervous system?;Neuroscience;Psychology;Physiology;Brain Stuff
+What pricing model ties fees to outcomes?;Value-based pricing;Time and materials;Fixed price;Good Job Bonus
+What Australian state is called the Sunshine State?;Queensland;New South Wales;Western Australia;Vitamin D Land
+What attack corrupts training data?;Data poisoning;Prompt injection;Model inversion;Keyboard Sabotage
+What explains survival of the fittest?;Natural selection;Lamarckism;Mutation;Nature Vibes
+What regulates Australian financial markets?;ASIC;APRA;ASX;Market Police
+What governance control requires human approval?;Human-in-the-loop;Observability;Logging;Asking Nicely
+What epic poem is attributed to Homer?;The Odyssey;The Iliad;Metamorphoses;Greek Stuff
+What airline uses the kangaroo logo?;Qantas;Virgin Australia;Jetstar;Flyaroo
+What statistical field models uncertainty?;Bayesian statistics;Deterministic modelling;Linear algebra;Guessology
+What genre features rhythmic spoken vocals?;Hip-hop;EDM;Rock;Fast Talking Music
+What document tracks project risks?;Risk register;Project charter;Invoice;Worry List
+What capital sits on Lake Burley Griffin?;Canberra;Sydney;Melbourne;Capital City
+What pattern ensures exactly-once processing?;Idempotent processing;At-least-once delivery;Transactions;Say It Only Once
+What evaluation failure leaks benchmarks into training?;Benchmark contamination;Overfitting;Data drift;Sneaky Studying
+What consulting risk misaligns incentives?;Moral hazard;Scope creep;Conflict of interest;Getting Paid Anyway
+What statistical concept explains mean reversion?;Regression to the mean;Central limit theorem;Law of large numbers;Stats Being Rude
+What principle limits executive power in Australia?;Separation of powers;Parliamentary sovereignty;Judicial review;No Funny Business
+What ML failure comes from proxy optimisation?;Objective misalignment;Overfitting;Bias;Teaching The Wrong Thing
+What term describes a story within a story?;Frame narrative;Metafiction;Intertextuality;Inception Writing
+What isolation level prevents phantom reads?;Serializable isolation;Repeatable read;Snapshot isolation;Ghost Protection
+What consulting risk expands unpaid work?;Scope creep;Gold plating;Change request;Free Labour
+What physics principle explains quantum uncertainty?;Heisenberg uncertainty principle;Wave-particle duality;Observer effect;Physics Vibes
+What alignment failure exploits reward functions?;Specification gaming;Hallucination;Prompt injection;Cheating The Teacher
+What Australian policy prices emissions?;Safeguard Mechanism;Carbon tax;Emissions trading;Pollution Fine Jar
+What music concept explains tension and release?;Harmonic resolution;Syncopation;Modulation;Musical Blue Balls
+What analytics failure leaks future labels?;Target leakage;Overfitting;Noise;Seeing The Future
+What philosophical problem challenges induction?;Problem of induction;Trolley problem;Problem of evil;Why Stuff Happens
+What artefact aligns stakeholders on value?;Business case;Project plan;Roadmap;Slide Deck Of Hope
+What AI scaling law balances data and compute?;Chinchilla scaling laws;Moore’s law;Zipf’s law;Big Computer Go Brr
+What Australian author won two Bookers?;Peter Carey;Patrick White;Richard Flanagan;Booker Collector
+What process corrects DNA replication errors?;DNA proofreading;Transcription;Translation;Gene Spellcheck
+What governance risk comes from opaque AI decisions?;Accountability gap;Bias;Drift;Nobody Knows Why
