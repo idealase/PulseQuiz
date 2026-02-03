@@ -311,13 +311,21 @@ export default function HostSession() {
                   i === 2 ? 'bg-amber-700 text-white' :
                   'bg-white/20'
                 }`}>
-                  {i + 1}
+                  {p.rank}
                 </div>
-                <span className="flex-1 font-medium">{p.nickname}</span>
+                <div className="flex-1">
+                  <span className="font-medium">{p.nickname}</span>
+                  <span className="text-white/40 text-sm ml-2">
+                    {p.totalTime.toFixed(1)}s
+                  </span>
+                </div>
                 <span className="text-xl font-bold text-primary">{p.score}</span>
               </div>
             ))}
           </div>
+          <p className="text-center text-white/40 text-sm">
+            Ties broken by fastest total answer time ⚡
+          </p>
 
           {/* Questions Review */}
           <div className="space-y-4">

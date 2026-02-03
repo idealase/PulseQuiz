@@ -42,6 +42,7 @@ export interface PlayerResult {
   nickname: string
   score: number
   rank: number
+  totalTime: number  // Total seconds to answer (tie-breaker)
 }
 
 export interface QuestionResult {

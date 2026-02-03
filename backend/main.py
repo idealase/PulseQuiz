@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import Optional
 import json
 import asyncio
+import time
 
 from models import (
     Session, Question, Player,
@@ -177,6 +178,7 @@ async def start_round(code: str, x_host_token: str = Header(alias="X-Host-Token"
     
     session.status = 'playing'
     session.current_question_index = 0
+    session.question_start_times[0] = time.time()  # Record start time
     
     # Broadcast to all
     await broadcast_to_session(code, {
@@ -211,6 +213,7 @@ async def next_question(code: str, x_host_token: str = Header(alias="X-Host-Toke
         raise HTTPException(status_code=400, detail="No more questions")
     
     session.current_question_index += 1
+    session.question_start_times[session.current_question_index] = time.time()  # Record start time
     
     await broadcast_to_session(code, {
         'type': 'question_started',
@@ -268,6 +271,10 @@ async def submit_answer(code: str, request: AnswerRequest):
         raise HTTPException(status_code=400, detail="Already answered")
     
     player.answers[request.questionIndex] = request.choice
+    
+    # Record answer time
+    start_time = session.question_start_times.get(request.questionIndex, time.time())
+    player.answer_times[request.questionIndex] = time.time() - start_time
     
     # Notify host only that someone answered (without revealing the answer)
     await broadcast_to_session(code, {

@@ -18,6 +18,7 @@ class Player(BaseModel):
     nickname: str
     score: int = 0
     answers: dict[int, int] = {}  # questionIndex -> choiceIndex
+    answer_times: dict[int, float] = {}  # questionIndex -> seconds to answer
 
 
 class SessionState(BaseModel):
@@ -34,6 +35,7 @@ class PlayerResult(BaseModel):
     nickname: str
     score: int
     rank: int
+    totalTime: float = 0.0  # Total time to answer all questions (tie-breaker)
 
 
 class QuestionResult(BaseModel):
@@ -60,6 +62,7 @@ class Session:
     players: dict[str, Player] = field(default_factory=dict)  # id -> Player
     questions: list[Question] = field(default_factory=list)
     round_size: int = 10
+    question_start_times: dict[int, float] = field(default_factory=dict)  # questionIndex -> timestamp
     
     def to_state(self, include_answers: bool = False) -> SessionState:
         """Convert to client-facing state (without correct answers during play)"""
@@ -104,20 +107,35 @@ class Session:
         """Get results for reveal, optionally personalized for a player"""
         self.calculate_scores()
         
-        # Sort players by score
+        # Calculate total answer time for each player
+        def get_total_time(player: Player) -> float:
+            return sum(player.answer_times.values())
+        
+        # Sort players by score (desc), then by total time (asc) for tie-break
         sorted_players = sorted(
             self.players.values(),
-            key=lambda p: p.score,
-            reverse=True
+            key=lambda p: (-p.score, get_total_time(p))
         )
         
+        # Assign ranks (players with same score and ~same time get same rank)
         player_results = []
+        current_rank = 1
         for i, p in enumerate(sorted_players):
+            # Check if this player ties with previous (same score)
+            if i > 0:
+                prev = sorted_players[i-1]
+                if p.score == prev.score:
+                    # Same score - rank based on time (already sorted)
+                    current_rank = i + 1
+                else:
+                    current_rank = i + 1
+            
             player_results.append(PlayerResult(
                 id=p.id,
                 nickname=p.nickname,
                 score=p.score,
-                rank=i + 1
+                rank=current_rank,
+                totalTime=round(get_total_time(p), 2)
             ))
         
         # Get the requesting player's answers

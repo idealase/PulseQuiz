@@ -238,6 +238,9 @@ export default function PlayerSession() {
                  myScore.rank === 3 ? '🥉 3rd Place!' :
                  `${myScore.rank}th Place`}
               </p>
+              <p className="text-white/60 text-sm mt-1">
+                Total time: {myScore.totalTime.toFixed(1)}s ⚡
+              </p>
             </div>
           )}
 
@@ -257,13 +260,19 @@ export default function PlayerSession() {
                   i === 2 ? 'bg-amber-700 text-white' :
                   'bg-white/20'
                 }`}>
-                  {i + 1}
+                  {p.rank}
                 </span>
-                <span className="flex-1 truncate">{p.nickname}</span>
+                <div className="flex-1 truncate">
+                  <span>{p.nickname}</span>
+                  <span className="text-white/40 text-xs ml-1">{p.totalTime.toFixed(1)}s</span>
+                </div>
                 <span className="font-bold">{p.score}</span>
               </div>
             ))}
           </div>
+          <p className="text-center text-white/40 text-xs mb-4">
+            Ties broken by fastest total answer time ⚡
+          </p>
 
           {/* Question Review */}
           <div className="space-y-3">
