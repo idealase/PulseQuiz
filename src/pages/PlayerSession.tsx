@@ -1,0 +1,284 @@
+import { useState, useEffect, useRef } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { useConfig } from '../context/ConfigContext'
+import { ApiClient } from '../api/client'
+import { SessionState, ServerMessage, RevealResults, QuestionResult } from '../types'
+
+export default function PlayerSession() {
+  const { code } = useParams<{ code: string }>()
+  const config = useConfig()
+  const navigate = useNavigate()
+  
+  const [session, setSession] = useState<SessionState | null>(null)
+  const [results, setResults] = useState<RevealResults | null>(null)
+  const [myResults, setMyResults] = useState<QuestionResult[] | null>(null)
+  const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
+  const [answerLocked, setAnswerLocked] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const wsRef = useRef<WebSocket | null>(null)
+  
+  const playerId = sessionStorage.getItem(`player_${code}`)
+  const nickname = sessionStorage.getItem(`nickname_${code}`)
+  const api = new ApiClient(config.apiBaseUrl)
+
+  useEffect(() => {
+    if (!code || !playerId) {
+      navigate(`/join/${code || ''}`)
+      return
+    }
+
+    const ws = new WebSocket(api.getWebSocketUrl(code))
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ type: 'identify_player', playerId }))
+    }
+
+    ws.onmessage = (event) => {
+      const msg: ServerMessage = JSON.parse(event.data)
+      
+      switch (msg.type) {
+        case 'session_state':
+          setSession(msg.state)
+          break
+        case 'question_started':
+          setSession(prev => prev ? {
+            ...prev,
+            status: 'playing',
+            currentQuestionIndex: msg.questionIndex
+          } : null)
+          // Reset answer state for new question
+          setSelectedAnswer(null)
+          setAnswerLocked(false)
+          break
+        case 'revealed':
+          setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
+          setResults(msg.results)
+          // Find my results
+          const myPlayer = msg.results.players.find(p => p.id === playerId)
+          if (myPlayer) {
+            // We need to compute individual answers from the results
+            setMyResults(msg.results.questions)
+          }
+          break
+        case 'error':
+          setError(msg.message)
+          break
+      }
+    }
+
+    ws.onerror = () => {
+      setError('Connection error')
+    }
+
+    ws.onclose = () => {
+      console.log('WebSocket closed')
+    }
+
+    return () => {
+      ws.close()
+    }
+  }, [code, playerId, config.apiBaseUrl])
+
+  const handleSelectAnswer = (choice: number) => {
+    if (answerLocked) return
+    setSelectedAnswer(choice)
+  }
+
+  const handleConfirmAnswer = async () => {
+    if (selectedAnswer === null || !code || !playerId || !session) return
+    
+    setAnswerLocked(true)
+    try {
+      await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to submit answer')
+      setAnswerLocked(false)
+    }
+  }
+
+  if (!session) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="animate-pulse text-xl mb-4">Connecting...</div>
+        <p className="text-white/60">{nickname}</p>
+      </div>
+    )
+  }
+
+  const currentQuestion = session.status === 'playing' && session.questions[session.currentQuestionIndex]
+  const myScore = results?.players.find(p => p.id === playerId)
+
+  // Option colors for visual variety
+  const optionColors = [
+    'from-red-500 to-red-600',
+    'from-blue-500 to-blue-600',
+    'from-yellow-500 to-yellow-600',
+    'from-green-500 to-green-600',
+  ]
+
+  return (
+    <div className="min-h-screen p-4 max-w-lg mx-auto flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <span className="text-white/60 text-sm">Playing as</span>
+          <p className="font-bold">{nickname}</p>
+        </div>
+        {session.status === 'playing' && (
+          <div className="text-right">
+            <span className="text-white/60 text-sm">Question</span>
+            <p className="font-bold">{session.currentQuestionIndex + 1} / {session.questions.length}</p>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+          {error}
+          <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
+        </div>
+      )}
+
+      {/* Lobby State */}
+      {session.status === 'lobby' && (
+        <div className="flex-1 flex flex-col items-center justify-center animate-slide-up">
+          <div className="animate-pulse-glow w-24 h-24 rounded-full bg-primary/30 flex items-center justify-center mb-6">
+            <span className="text-4xl">⏳</span>
+          </div>
+          <h2 className="text-2xl font-bold mb-2">Waiting for host</h2>
+          <p className="text-white/60">Get ready!</p>
+          <p className="mt-4 text-white/40 text-sm">
+            {session.players.length} player{session.players.length !== 1 ? 's' : ''} joined
+          </p>
+        </div>
+      )}
+
+      {/* Playing State */}
+      {session.status === 'playing' && currentQuestion && (
+        <div className="flex-1 flex flex-col animate-slide-up">
+          {/* Question */}
+          <div className="bg-white/10 rounded-2xl p-5 mb-4">
+            <h2 className="text-lg md:text-xl font-bold text-center">
+              {currentQuestion.question}
+            </h2>
+          </div>
+
+          {/* Options */}
+          <div className="flex-1 grid grid-cols-1 gap-3">
+            {currentQuestion.options.map((opt, i) => (
+              <button
+                key={i}
+                onClick={() => handleSelectAnswer(i)}
+                disabled={answerLocked}
+                className={`p-4 rounded-xl text-left font-medium transition-all active:scale-98 ${
+                  answerLocked 
+                    ? selectedAnswer === i 
+                      ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
+                      : 'bg-white/5 opacity-50'
+                    : selectedAnswer === i
+                      ? `bg-gradient-to-r ${optionColors[i]} ring-4 ring-white/50`
+                      : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
+                }`}
+              >
+                <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                {opt}
+              </button>
+            ))}
+          </div>
+
+          {/* Confirm Button */}
+          {!answerLocked ? (
+            <button
+              onClick={handleConfirmAnswer}
+              disabled={selectedAnswer === null}
+              className="mt-4 py-4 text-lg font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+            >
+              Lock In Answer
+            </button>
+          ) : (
+            <div className="mt-4 py-4 text-lg font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500">
+              ✓ Answer Locked
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Revealed State */}
+      {session.status === 'revealed' && results && (
+        <div className="flex-1 animate-slide-up overflow-y-auto">
+          {/* My Score */}
+          {myScore && (
+            <div className="bg-gradient-to-r from-primary to-secondary rounded-2xl p-6 text-center mb-6">
+              <p className="text-white/80 mb-1">Your Score</p>
+              <p className="text-5xl font-black">{myScore.score}</p>
+              <p className="mt-2 text-xl">
+                {myScore.rank === 1 ? '🥇 1st Place!' :
+                 myScore.rank === 2 ? '🥈 2nd Place!' :
+                 myScore.rank === 3 ? '🥉 3rd Place!' :
+                 `${myScore.rank}th Place`}
+              </p>
+            </div>
+          )}
+
+          {/* Leaderboard */}
+          <div className="bg-white/10 rounded-2xl overflow-hidden mb-6">
+            <h3 className="p-4 font-bold border-b border-white/10">Leaderboard</h3>
+            {results.players.slice(0, 5).map((p, i) => (
+              <div 
+                key={p.id}
+                className={`flex items-center p-3 ${i > 0 ? 'border-t border-white/10' : ''} ${
+                  p.id === playerId ? 'bg-primary/20' : ''
+                }`}
+              >
+                <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 text-sm ${
+                  i === 0 ? 'bg-yellow-500 text-black' :
+                  i === 1 ? 'bg-gray-300 text-black' :
+                  i === 2 ? 'bg-amber-700 text-white' :
+                  'bg-white/20'
+                }`}>
+                  {i + 1}
+                </span>
+                <span className="flex-1 truncate">{p.nickname}</span>
+                <span className="font-bold">{p.score}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Question Review */}
+          <div className="space-y-3">
+            <h3 className="font-bold">Your Answers</h3>
+            {myResults?.map((q, i) => (
+              <div key={i} className={`rounded-xl p-4 ${
+                q.answeredCorrectly ? 'bg-green-500/20' : 'bg-red-500/20'
+              }`}>
+                <p className="text-sm text-white/80 mb-1">Q{i + 1}. {q.question}</p>
+                <div className="flex items-center gap-2 text-sm">
+                  {q.yourAnswer !== undefined ? (
+                    <>
+                      <span className={q.answeredCorrectly ? 'text-green-400' : 'text-red-400'}>
+                        Your answer: {String.fromCharCode(65 + q.yourAnswer)}
+                      </span>
+                      {!q.answeredCorrectly && (
+                        <span className="text-green-400">
+                          • Correct: {String.fromCharCode(65 + q.correct)}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-white/50">Not answered</span>
+                  )}
+                </div>
+                {q.explanation && (
+                  <p className="text-white/60 text-sm mt-2 italic">
+                    💡 {q.explanation}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
