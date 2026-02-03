@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
-import { ApiClient } from '../api/client'
+import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, QuestionResult } from '../types'
 
 export default function PlayerSession() {
@@ -15,7 +15,8 @@ export default function PlayerSession() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [answerLocked, setAnswerLocked] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const wsRef = useRef<WebSocket | null>(null)
+  const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling' | null>(null)
+  const connectionRef = useRef<{ send: (data: unknown) => void; close: () => void } | null>(null)
   
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
@@ -27,76 +28,50 @@ export default function PlayerSession() {
       return
     }
 
-    let ws: WebSocket | null = null
-    let reconnectAttempts = 0
-    const maxReconnectAttempts = 5
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
-
-    const connect = () => {
-      ws = new WebSocket(api.getWebSocketUrl(code))
-      wsRef.current = ws
-
-      ws.onopen = () => {
-        reconnectAttempts = 0
-        setError(null)
-        ws?.send(JSON.stringify({ type: 'identify_player', playerId }))
-      }
-
-      ws.onmessage = (event) => {
-        const msg: ServerMessage = JSON.parse(event.data)
-        
-        switch (msg.type) {
-          case 'session_state':
-            setSession(msg.state)
-            break
-          case 'question_started':
-            setSession(prev => prev ? {
-              ...prev,
-              status: 'playing',
-              currentQuestionIndex: msg.questionIndex
-            } : null)
-            // Reset answer state for new question
-            setSelectedAnswer(null)
-            setAnswerLocked(false)
-            break
-          case 'revealed':
-            setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
-            setResults(msg.results)
-            // Find my results
-            const myPlayer = msg.results.players.find(p => p.id === playerId)
-            if (myPlayer) {
-              // We need to compute individual answers from the results
-              setMyResults(msg.results.questions)
-            }
-            break
-          case 'error':
-            setError(msg.message)
-            break
-        }
-      }
-
-      ws.onerror = () => {
-        // Error will trigger onclose
-      }
-
-      ws.onclose = () => {
-        wsRef.current = null
-        if (reconnectAttempts < maxReconnectAttempts) {
-          reconnectAttempts++
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
-          setError(`Connection lost. Reconnecting in ${delay/1000}s...`)
-          reconnectTimeout = setTimeout(connect, delay)
-        } else {
-          setError('Connection lost. Please refresh the page.')
-        }
+    const handleMessage = (msg: ServerMessage) => {
+      switch (msg.type) {
+        case 'session_state':
+          setSession(msg.state)
+          break
+        case 'question_started':
+          setSession(prev => prev ? {
+            ...prev,
+            status: 'playing',
+            currentQuestionIndex: msg.questionIndex
+          } : null)
+          // Reset answer state for new question
+          setSelectedAnswer(null)
+          setAnswerLocked(false)
+          break
+        case 'revealed':
+          setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
+          setResults(msg.results)
+          // Find my results
+          const myPlayer = msg.results.players.find(p => p.id === playerId)
+          if (myPlayer) {
+            // We need to compute individual answers from the results
+            setMyResults(msg.results.questions)
+          }
+          break
+        case 'error':
+          setError(msg.message)
+          break
       }
     }
 
-    connect()
+    setError(null)
+    const connection = createSmartConnection(
+      api,
+      code,
+      { playerId },
+      (data) => handleMessage(data as ServerMessage),
+      (err) => setError(err.message),
+      (mode) => setConnectionMode(mode)
+    )
+    connectionRef.current = connection
 
     return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout)
-      ws?.close()
+      connection.close()
     }
   }, [code, playerId, config.apiBaseUrl])
 
@@ -152,6 +127,13 @@ export default function PlayerSession() {
           </div>
         )}
       </div>
+
+      {/* Connection mode indicator */}
+      {connectionMode === 'polling' && (
+        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
+          📡 Corporate network mode
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">

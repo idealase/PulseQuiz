@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
-import { ApiClient } from '../api/client'
+import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults } from '../types'
 
 export default function HostSession() {
@@ -13,7 +13,8 @@ export default function HostSession() {
   const [results, setResults] = useState<RevealResults | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
+  const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling' | null>(null)
+  const connectionRef = useRef<{ send: (data: unknown) => void; close: () => void } | null>(null)
   
   const hostToken = sessionStorage.getItem(`host_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
@@ -24,93 +25,67 @@ export default function HostSession() {
       return
     }
 
-    let ws: WebSocket | null = null
-    let reconnectAttempts = 0
-    const maxReconnectAttempts = 5
-    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
-
-    const connect = () => {
-      ws = new WebSocket(api.getWebSocketUrl(code))
-      wsRef.current = ws
-
-      ws.onopen = () => {
-        reconnectAttempts = 0
-        setError(null)
-        ws?.send(JSON.stringify({ type: 'identify_host', hostToken }))
-      }
-
-      ws.onmessage = (event) => {
-        const msg: ServerMessage = JSON.parse(event.data)
-        
-        switch (msg.type) {
-          case 'session_state':
-            setSession(msg.state)
-            break
-          case 'player_joined':
-            setSession(prev => prev ? {
+    const handleMessage = (msg: ServerMessage) => {
+      switch (msg.type) {
+        case 'session_state':
+          setSession(msg.state)
+          break
+        case 'player_joined':
+          setSession(prev => prev ? {
+            ...prev,
+            players: [...prev.players, msg.player]
+          } : null)
+          break
+        case 'player_left':
+          setSession(prev => prev ? {
+            ...prev,
+            players: prev.players.filter(p => p.id !== msg.playerId)
+          } : null)
+          break
+        case 'answer_received':
+          // Update the player's answers in state
+          setSession(prev => {
+            if (!prev) return null
+            return {
               ...prev,
-              players: [...prev.players, msg.player]
-            } : null)
-            break
-          case 'player_left':
-            setSession(prev => prev ? {
-              ...prev,
-              players: prev.players.filter(p => p.id !== msg.playerId)
-            } : null)
-            break
-          case 'answer_received':
-            // Update the player's answers in state
-            setSession(prev => {
-              if (!prev) return null
-              return {
-                ...prev,
-                players: prev.players.map(p => 
-                  p.id === msg.playerId 
-                    ? { ...p, answers: { ...p.answers, [msg.questionIndex]: -1 } } // -1 as placeholder, we don't know the actual answer
-                    : p
-                )
-              }
-            })
-            break
-          case 'question_started':
-            setSession(prev => prev ? {
-              ...prev,
-              status: 'playing',
-              currentQuestionIndex: msg.questionIndex
-            } : null)
-            break
-          case 'revealed':
-            setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
-            setResults(msg.results)
-            break
-          case 'error':
-            setError(msg.message)
-            break
-        }
-      }
-
-      ws.onerror = () => {
-        // Error will trigger onclose
-      }
-
-      ws.onclose = () => {
-        wsRef.current = null
-        if (reconnectAttempts < maxReconnectAttempts) {
-          reconnectAttempts++
-          const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000)
-          setError(`Connection lost. Reconnecting in ${delay/1000}s...`)
-          reconnectTimeout = setTimeout(connect, delay)
-        } else {
-          setError('Connection lost. Please refresh the page.')
-        }
+              players: prev.players.map(p => 
+                p.id === msg.playerId 
+                  ? { ...p, answers: { ...p.answers, [msg.questionIndex]: -1 } } // -1 as placeholder, we don't know the actual answer
+                  : p
+              )
+            }
+          })
+          break
+        case 'question_started':
+          setSession(prev => prev ? {
+            ...prev,
+            status: 'playing',
+            currentQuestionIndex: msg.questionIndex
+          } : null)
+          break
+        case 'revealed':
+          setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
+          setResults(msg.results)
+          break
+        case 'error':
+          setError(msg.message)
+          break
       }
     }
 
-    connect()
+    setError(null)
+    const connection = createSmartConnection(
+      api,
+      code,
+      { hostToken },
+      (data) => handleMessage(data as ServerMessage),
+      (err) => setError(err.message),
+      (mode) => setConnectionMode(mode)
+    )
+    connectionRef.current = connection
 
     return () => {
-      if (reconnectTimeout) clearTimeout(reconnectTimeout)
-      ws?.close()
+      connection.close()
     }
   }, [code, hostToken, config.apiBaseUrl])
 
@@ -174,6 +149,13 @@ export default function HostSession() {
           <p className="text-2xl font-bold">{session.players.length}</p>
         </div>
       </div>
+
+      {/* Connection mode indicator */}
+      {connectionMode === 'polling' && (
+        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
+          📡 Using polling mode (corporate network detected)
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">

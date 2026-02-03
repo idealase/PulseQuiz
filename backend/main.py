@@ -30,6 +30,24 @@ sessions: dict[str, Session] = {}
 # session_code -> { connection_id -> (websocket, role, id) }
 ws_connections: dict[str, dict[str, tuple[WebSocket, str, str]]] = {}
 
+# Event storage for polling fallback (Zscaler/corporate networks)
+session_events: dict[str, list[dict]] = {}
+MAX_EVENTS_PER_SESSION = 100
+
+
+def add_session_event(code: str, event: dict):
+    """Add an event to the session's event queue for polling clients"""
+    if code not in session_events:
+        session_events[code] = []
+    session_events[code].append({
+        **event,
+        '_eventId': len(session_events[code]),
+        '_timestamp': time.time()
+    })
+    # Keep only last N events
+    if len(session_events[code]) > MAX_EVENTS_PER_SESSION:
+        session_events[code] = session_events[code][-MAX_EVENTS_PER_SESSION:]
+
 
 # --- Request/Response Models ---
 
@@ -60,6 +78,12 @@ class AnswerRequest(BaseModel):
 
 async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None, host_only: bool = False):
     """Broadcast a message to all connections in a session"""
+    # Store event for polling fallback
+    if code not in session_events:
+        session_events[code] = []
+    event_copy = {**message, '_hostOnly': host_only}
+    add_session_event(code, event_copy)
+    
     if code not in ws_connections:
         return
     
@@ -373,6 +397,95 @@ async def websocket_session(websocket: WebSocket, code: str):
 async def health():
     """Health check endpoint"""
     return {"status": "ok"}
+
+
+# --- Polling Fallback Endpoints (for Zscaler/corporate networks where WebSockets are blocked) ---
+
+@app.get("/api/session/{code}/state")
+async def get_session_state(
+    code: str,
+    player_id: Optional[str] = None,
+    x_host_token: Optional[str] = Header(default=None, alias="X-Host-Token")
+):
+    """Get current session state (polling fallback for WebSocket)"""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    # Verify caller is authorized (either host or valid player)
+    if x_host_token:
+        if session.host_token != x_host_token:
+            raise HTTPException(status_code=403, detail="Invalid host token")
+    elif player_id:
+        if player_id not in session.players:
+            raise HTTPException(status_code=404, detail="Player not found")
+    else:
+        raise HTTPException(status_code=400, detail="Must provide player_id or X-Host-Token")
+    
+    state = session.to_state().model_dump()
+    
+    # If revealed and this is a player, personalize the results
+    if session.status == 'revealed' and player_id:
+        results = session.get_reveal_results(player_id)
+        state['revealResults'] = results.model_dump()
+    elif session.status == 'revealed' and x_host_token:
+        results = session.get_reveal_results()
+        state['revealResults'] = results.model_dump()
+    
+    return state
+
+
+@app.get("/api/session/{code}/events")
+async def get_session_events(
+    code: str,
+    since_id: int = 0,
+    player_id: Optional[str] = None,
+    x_host_token: Optional[str] = Header(default=None, alias="X-Host-Token")
+):
+    """Get events since a given event ID (long-polling fallback for WebSocket)"""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    # Verify caller is authorized
+    if x_host_token:
+        if session.host_token != x_host_token:
+            raise HTTPException(status_code=403, detail="Invalid host token")
+        role = 'host'
+    elif player_id:
+        if player_id not in session.players:
+            raise HTTPException(status_code=404, detail="Player not found")
+        role = 'player'
+    else:
+        raise HTTPException(status_code=400, detail="Must provide player_id or X-Host-Token")
+    
+    events = session_events.get(code, [])
+    new_events = [e for e in events if e.get('_eventId', 0) > since_id]
+    
+    # Filter and personalize events for players
+    if role == 'player':
+        filtered = []
+        for event in new_events:
+            # Skip host-only events
+            if event.get('_hostOnly'):
+                continue
+            # Personalize reveal results
+            if event.get('type') == 'revealed' and player_id:
+                personalized = session.get_reveal_results(player_id)
+                filtered.append({
+                    **event,
+                    'results': personalized.model_dump()
+                })
+            else:
+                filtered.append(event)
+        new_events = filtered
+    
+    return {
+        'events': new_events,
+        'lastEventId': events[-1]['_eventId'] if events else 0
+    }
 
 
 if __name__ == "__main__":
