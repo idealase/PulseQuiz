@@ -5,6 +5,7 @@ import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
+import { getShuffledQuestions } from '../data/defaultQuestions'
 
 export default function HostCreate() {
   const config = useConfig()
@@ -155,6 +156,21 @@ export default function HostCreate() {
                 Menti-style format
               </p>
             </label>
+          </div>
+
+          {/* Default Quiz Button */}
+          <div className="text-center">
+            <p className="text-white/40 text-sm mb-2">— or —</p>
+            <button
+              onClick={() => {
+                const questions = getShuffledQuestions(20)
+                setQuestions(questions)
+                setCsvErrors([])
+              }}
+              className="px-6 py-3 text-lg font-bold rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 hover:border-white/50 transition-all"
+            >
+              🎲 Use Default Quiz (20 random Qs)
+            </button>
           </div>
 
           {/* CSV Errors */}
