@@ -1,0 +1,23 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://stratiformis-blaine-orchestrally.ngrok-free.dev/api/:path*"
+    },
+    {
+      "source": "/ws/:path*",
+      "destination": "https://stratiformis-blaine-orchestrally.ngrok-free.dev/ws/:path*"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/:path*",
+      "headers": [
+        { "key": "ngrok-skip-browser-warning", "value": "true" }
+      ]
+    }
+  ]
+}

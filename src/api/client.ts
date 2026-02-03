@@ -91,6 +91,11 @@ export class ApiClient {
   }
 
   getWebSocketUrl(code: string): string {
+    // If baseUrl is empty (same-origin proxy), construct from window.location
+    if (!this.baseUrl) {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+      return `${protocol}//${window.location.host}/ws/session/${code}`
+    }
     const wsBase = this.baseUrl.replace(/^http/, 'ws')
     return `${wsBase}/ws/session/${code}`
   }
