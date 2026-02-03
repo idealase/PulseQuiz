@@ -25,6 +25,7 @@ export function ConfigProvider({ children }: { children: ReactNode }) {
         console.error('Config load error:', err)
         // Fallback to localhost for development
         setConfig({ apiBaseUrl: 'http://localhost:8000' })
+        setError(null) // Clear any previous error on fallback
       })
   }, [])
 
