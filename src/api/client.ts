@@ -18,6 +18,7 @@ export class ApiClient {
       ...options,
       headers: {
         'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',  // Bypass ngrok interstitial
         ...options.headers,
       },
     })
