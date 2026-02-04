@@ -1,6 +1,9 @@
 import { Link } from 'react-router-dom'
+import { useConfig } from '../context/ConfigContext'
 
 export default function Landing() {
+  const config = useConfig()
+  
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
       <div className="text-center mb-12 animate-slide-up">
@@ -8,7 +11,7 @@ export default function Landing() {
           PulseQuiz
         </h1>
         <p className="text-white/60 text-lg md:text-xl">
-          Real-time team quiz battles
+          Real-time team quiz battles{config.customMessage && ` — ${config.customMessage}`}
         </p>
       </div>
 

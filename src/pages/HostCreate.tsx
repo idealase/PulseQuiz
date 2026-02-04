@@ -5,7 +5,7 @@ import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
-import { getShuffledQuestions } from '../data/defaultQuestions'
+import { questionSets, getShuffledQuestionsFromSet, QuestionSetId } from '../data/defaultQuestions'
 
 export default function HostCreate() {
   const config = useConfig()
@@ -202,19 +202,26 @@ export default function HostCreate() {
             </label>
           </div>
 
-          {/* Default Quiz Button */}
+          {/* Default Quiz Options */}
           <div className="text-center">
-            <p className="text-white/40 text-sm mb-2">— or —</p>
-            <button
-              onClick={() => {
-                const questions = getShuffledQuestions(20)
-                setQuestions(questions)
-                setCsvErrors([])
-              }}
-              className="px-6 py-3 text-lg font-bold rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 hover:border-white/50 transition-all"
-            >
-              🎲 Use Default Quiz (20 random Qs)
-            </button>
+            <p className="text-white/40 text-sm mb-3">— or use a preset quiz —</p>
+            <div className="grid gap-2">
+              {questionSets.map((set) => (
+                <button
+                  key={set.id}
+                  onClick={() => {
+                    const questions = getShuffledQuestionsFromSet(set.id as QuestionSetId, 20)
+                    setQuestions(questions)
+                    setCsvErrors([])
+                  }}
+                  className="w-full px-4 py-3 text-left font-medium rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 hover:border-white/50 transition-all"
+                >
+                  <span className="text-xl mr-2">{set.emoji}</span>
+                  <span className="font-bold">{set.name}</span>
+                  <span className="text-white/50 text-sm ml-2">— {set.description}</span>
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* CSV Errors */}

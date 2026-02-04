@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 
 interface Config {
   apiBaseUrl: string
+  customMessage?: string
 }
 
 const ConfigContext = createContext<Config | null>(null)

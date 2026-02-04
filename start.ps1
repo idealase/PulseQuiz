@@ -5,7 +5,8 @@ param(
     [switch]$UseNgrok,        # Use ngrok instead of Cloudflare Tunnel
     [switch]$SkipDeploy,      # Skip GitHub Pages deploy (ngrok mode only)
     [switch]$SkipBuild,       # Skip frontend build
-    [int]$Port = 8000
+    [int]$Port = 8000,
+    [string]$Message = ""     # Custom message to display on home page
 )
 
 $ErrorActionPreference = "Stop"
@@ -59,13 +60,17 @@ if (-not $UseNgrok -and -not $SkipBuild) {
 # Update config.json for self-hosted mode (empty = same-origin)
 if (-not $UseNgrok) {
     $configPath = Join-Path $ScriptDir "public\config.json"
-    $config = @{ apiBaseUrl = "" } | ConvertTo-Json
+    $config = @{ apiBaseUrl = ""; customMessage = $Message } | ConvertTo-Json
     Set-Content -Path $configPath -Value $config -Encoding UTF8
     
     # Also update dist config if it exists
     $distConfigPath = Join-Path $ScriptDir "dist\config.json"
     if (Test-Path (Split-Path $distConfigPath)) {
         Set-Content -Path $distConfigPath -Value $config -Encoding UTF8
+    }
+    
+    if ($Message) {
+        Write-Host "📝 Custom message: $Message" -ForegroundColor Magenta
     }
 }
 

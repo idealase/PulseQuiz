@@ -1,7 +1,18 @@
 import { Question } from '../types'
 
+// Question Set Type
+export type QuestionSetId = 'general' | 'expert' | 'startup'
+
+export interface QuestionSet {
+  id: QuestionSetId
+  name: string
+  emoji: string
+  description: string
+  questions: Question[]
+}
+
 // Default quiz questions - General Knowledge Mix
-export const defaultQuestions: Question[] = [
+export const generalQuestions: Question[] = [
   {
     question: "What architectural pattern stores immutable events as the source of truth?",
     options: ["Event sourcing", "CQRS", "Lambda architecture", "Write-Only Living"],
@@ -424,10 +435,286 @@ export const defaultQuestions: Question[] = [
   }
 ]
 
+// Expert Trivia - Super challenging questions for only the best trivia-heads
+export const expertQuestions: Question[] = [
+  {
+    question: "In what year did the Byzantine Empire officially fall to the Ottoman Turks?",
+    options: ["1453", "1204", "1389", "1492"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the only letter that doesn't appear in any US state name?",
+    options: ["Q", "X", "Z", "J"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the Chandrasekhar limit approximately equal to?",
+    options: ["1.4 solar masses", "2.8 solar masses", "0.7 solar masses", "3.2 solar masses"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which chess opening begins with 1.e4 c5?",
+    options: ["Sicilian Defense", "French Defense", "Caro-Kann Defense", "Italian Game"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the only country to have a non-rectangular flag?",
+    options: ["Nepal", "Switzerland", "Vatican City", "Japan"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Who composed 'The Well-Tempered Clavier'?",
+    options: ["Johann Sebastian Bach", "Wolfgang Amadeus Mozart", "Ludwig van Beethoven", "Franz Schubert"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the chemical formula for the mineral pyrite?",
+    options: ["FeS₂", "Fe₂O₃", "CuFeS₂", "FeAsS"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which author wrote under the pseudonym 'George Eliot'?",
+    options: ["Mary Ann Evans", "Charlotte Brontë", "Jane Austen", "Virginia Woolf"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What theorem states that every even integer > 2 can be expressed as the sum of two primes?",
+    options: ["Goldbach's conjecture", "Fermat's Last Theorem", "Riemann Hypothesis", "Twin Prime conjecture"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "In which organ of the body would you find the Islets of Langerhans?",
+    options: ["Pancreas", "Liver", "Kidney", "Spleen"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What ancient wonder was located in the city of Halicarnassus?",
+    options: ["Mausoleum at Halicarnassus", "Colossus of Rhodes", "Temple of Artemis", "Lighthouse of Alexandria"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the deepest point in the Earth's oceans?",
+    options: ["Challenger Deep", "Puerto Rico Trench", "Java Trench", "Tonga Trench"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Who painted 'The Garden of Earthly Delights'?",
+    options: ["Hieronymus Bosch", "Pieter Bruegel", "Jan van Eyck", "Albrecht Dürer"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What programming language was created by Bjarne Stroustrup?",
+    options: ["C++", "Java", "Python", "C#"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "In Norse mythology, what is the name of the world tree?",
+    options: ["Yggdrasil", "Midgard", "Asgard", "Bifrost"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What particle was discovered at CERN in 2012?",
+    options: ["Higgs boson", "Top quark", "W boson", "Graviton"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which treaty ended World War I with Germany?",
+    options: ["Treaty of Versailles", "Treaty of Trianon", "Treaty of Brest-Litovsk", "Treaty of Saint-Germain"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the capital city of Bhutan?",
+    options: ["Thimphu", "Kathmandu", "Vientiane", "Naypyidaw"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "In cryptography, what does RSA stand for?",
+    options: ["Rivest-Shamir-Adleman", "Random Secure Algorithm", "Rotating Secret Access", "Recursive Symmetric Arithmetic"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the SI unit of electrical capacitance?",
+    options: ["Farad", "Henry", "Ohm", "Coulomb"],
+    correct: 0,
+    points: 1
+  }
+]
+
+// Startup Founder Questions - VC, business, and tech state of the art
+export const startupQuestions: Question[] = [
+  {
+    question: "What does 'ARR' stand for in SaaS metrics?",
+    options: ["Annual Recurring Revenue", "Average Revenue Rate", "Accumulated Revenue Return", "Annual Revenue Ratio"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What term describes a startup valued at over $1 billion?",
+    options: ["Unicorn", "Decacorn", "Centaur", "Phoenix"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What funding round typically comes after Series A?",
+    options: ["Series B", "Series C", "Growth round", "Bridge round"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is a 'SAFE' in startup fundraising?",
+    options: ["Simple Agreement for Future Equity", "Standard Asset For Equity", "Secured Advance for Financing Enterprise", "Startup Accelerated Funding Exchange"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What metric measures the cost to acquire a customer?",
+    options: ["CAC", "LTV", "MRR", "NPS"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'PMF' stand for in startup terminology?",
+    options: ["Product-Market Fit", "Performance Measurement Framework", "Pre-Money Funding", "Product Management Function"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the typical equity range VCs expect for a Series A?",
+    options: ["15-25%", "5-10%", "40-50%", "1-5%"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does a '409A valuation' determine?",
+    options: ["Fair market value of common stock", "Company revenue projections", "VC ownership percentage", "Employee headcount limits"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is 'runway' in startup terms?",
+    options: ["Months of cash remaining", "Path to IPO", "Marketing strategy", "Product roadmap timeline"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What startup accelerator was founded by Paul Graham?",
+    options: ["Y Combinator", "Techstars", "500 Startups", "Seedcamp"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'burn rate' measure?",
+    options: ["Monthly cash spending", "Customer churn percentage", "Server processing speed", "Employee turnover"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is a 'cap table'?",
+    options: ["Capitalization table showing ownership", "Customer acquisition targets", "Capital expenditure budget", "Capacity planning tool"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'LTV:CAC ratio' indicate when it's 3:1?",
+    options: ["Healthy unit economics", "Poor growth potential", "Over-investment in sales", "Unprofitable customers"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is 'dilution' in the context of fundraising?",
+    options: ["Reduction in ownership percentage", "Decrease in company valuation", "Loss of voting rights", "Decline in revenue"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What framework popularized 'Jobs to be Done' theory?",
+    options: ["Clayton Christensen", "Eric Ries", "Steve Blank", "Peter Thiel"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is a 'down round'?",
+    options: ["Funding at lower valuation than previous", "Final funding before IPO", "Emergency bridge financing", "Debt conversion event"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'NRR' measure in SaaS businesses?",
+    options: ["Net Revenue Retention", "New Revenue Rate", "Normalized Revenue Ratio", "Net Recurring Revenue"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What legal structure do most US startups use?",
+    options: ["Delaware C-Corp", "LLC", "S-Corp", "B-Corp"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is a 'term sheet'?",
+    options: ["Non-binding investment offer outlining terms", "Final legal funding agreement", "Employee stock option plan", "Quarterly financial report"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'MVP' stand for in lean startup methodology?",
+    options: ["Minimum Viable Product", "Most Valuable Proposition", "Market Validation Process", "Measured Value Performance"],
+    correct: 0,
+    points: 1
+  }
+]
+
+// Legacy export for backward compatibility
+export const defaultQuestions = generalQuestions
+
+// All question sets with metadata
+export const questionSets: QuestionSet[] = [
+  {
+    id: 'general',
+    name: 'General Knowledge',
+    emoji: '🎯',
+    description: 'Mixed trivia covering tech, culture, and business',
+    questions: generalQuestions
+  },
+  {
+    id: 'expert',
+    name: 'Expert Trivia',
+    emoji: '🧠',
+    description: 'Super challenging questions for trivia masters',
+    questions: expertQuestions
+  },
+  {
+    id: 'startup',
+    name: 'Startup Founders',
+    emoji: '🚀',
+    description: 'VC, business, and tech state of the art',
+    questions: startupQuestions
+  }
+]
+
 // Shuffle and randomize answer order for each question
-export function getShuffledQuestions(count?: number): Question[] {
+function shuffleQuestions(questions: Question[], count?: number): Question[] {
   // Deep clone and shuffle answer options for each question
-  const shuffled = defaultQuestions.map(q => {
+  const shuffled = questions.map(q => {
     const options = [...q.options]
     const correctAnswer = options[q.correct]
     
@@ -455,4 +742,16 @@ export function getShuffledQuestions(count?: number): Question[] {
   
   // Return requested count or all
   return count ? shuffled.slice(0, count) : shuffled
+}
+
+// Get shuffled questions from a specific set
+export function getShuffledQuestionsFromSet(setId: QuestionSetId, count?: number): Question[] {
+  const set = questionSets.find(s => s.id === setId)
+  if (!set) return shuffleQuestions(generalQuestions, count)
+  return shuffleQuestions(set.questions, count)
+}
+
+// Legacy function for backward compatibility
+export function getShuffledQuestions(count?: number): Question[] {
+  return shuffleQuestions(generalQuestions, count)
 }
