@@ -21,6 +21,11 @@ class Player(BaseModel):
     answer_times: dict[int, float] = {}  # questionIndex -> seconds to answer
 
 
+class GameSettings(BaseModel):
+    timerMode: bool = False
+    timerSeconds: int = 15
+
+
 class SessionState(BaseModel):
     code: str
     status: str  # 'lobby' | 'playing' | 'revealed'
@@ -28,6 +33,8 @@ class SessionState(BaseModel):
     players: list[Player]
     questions: list[Question]
     roundSize: int = 10
+    settings: GameSettings = GameSettings()
+    timerRemaining: Optional[int] = None  # Seconds remaining on current question
 
 
 class PlayerResult(BaseModel):
@@ -53,6 +60,27 @@ class RevealResults(BaseModel):
     questions: list[QuestionResult]
 
 
+class LiveLeaderboardEntry(BaseModel):
+    id: str
+    nickname: str
+    score: int
+    rank: int
+    correctAnswers: int
+    totalAnswers: int
+
+
+class QuestionStats(BaseModel):
+    questionIndex: int
+    totalPlayers: int
+    answeredCount: int
+    distribution: list[int]  # Count per option
+
+
+class AnswerStatus(BaseModel):
+    answered: list[str]  # Player IDs who answered
+    waiting: list[str]   # Player IDs who haven't answered
+
+
 @dataclass
 class Session:
     code: str
@@ -63,6 +91,11 @@ class Session:
     questions: list[Question] = field(default_factory=list)
     round_size: int = 10
     question_start_times: dict[int, float] = field(default_factory=dict)  # questionIndex -> timestamp
+    observers: dict[str, str] = field(default_factory=dict)  # observer_id -> connection_id
+    timer_mode: bool = False
+    timer_seconds: int = 15
+    timer_remaining: Optional[int] = None
+    timer_task: Optional[object] = None  # asyncio Task reference
     
     def to_state(self, include_answers: bool = False) -> SessionState:
         """Convert to client-facing state (without correct answers during play)"""
@@ -89,7 +122,9 @@ class Session:
             currentQuestionIndex=self.current_question_index,
             players=players_list,
             questions=questions_for_client,
-            roundSize=self.round_size
+            roundSize=self.round_size,
+            settings=GameSettings(timerMode=self.timer_mode, timerSeconds=self.timer_seconds),
+            timerRemaining=self.timer_remaining
         )
     
     def calculate_scores(self) -> None:
@@ -164,6 +199,86 @@ class Session:
             players=player_results,
             questions=question_results
         )
+
+    def get_live_leaderboard(self) -> list[LiveLeaderboardEntry]:
+        """Get current leaderboard with scores calculated so far"""
+        # Calculate current scores
+        entries = []
+        for player in self.players.values():
+            score = 0
+            correct_count = 0
+            for q_idx, choice in player.answers.items():
+                if q_idx < len(self.questions):
+                    question = self.questions[q_idx]
+                    if choice == question.correct:
+                        score += question.points
+                        correct_count += 1
+            entries.append({
+                'id': player.id,
+                'nickname': player.nickname,
+                'score': score,
+                'correctAnswers': correct_count,
+                'totalAnswers': len(player.answers),
+                'totalTime': sum(player.answer_times.values())
+            })
+        
+        # Sort by score desc, then by time asc
+        entries.sort(key=lambda e: (-e['score'], e['totalTime']))
+        
+        # Assign ranks
+        result = []
+        for i, e in enumerate(entries):
+            result.append(LiveLeaderboardEntry(
+                id=e['id'],
+                nickname=e['nickname'],
+                score=e['score'],
+                rank=i + 1,
+                correctAnswers=e['correctAnswers'],
+                totalAnswers=e['totalAnswers']
+            ))
+        return result
+
+    def get_question_stats(self, question_index: int) -> QuestionStats:
+        """Get answer distribution for a specific question"""
+        if question_index >= len(self.questions):
+            return QuestionStats(
+                questionIndex=question_index,
+                totalPlayers=len(self.players),
+                answeredCount=0,
+                distribution=[]
+            )
+        
+        question = self.questions[question_index]
+        num_options = len(question.options)
+        distribution = [0] * num_options
+        answered_count = 0
+        
+        for player in self.players.values():
+            if question_index in player.answers:
+                answered_count += 1
+                choice = player.answers[question_index]
+                if 0 <= choice < num_options:
+                    distribution[choice] += 1
+        
+        return QuestionStats(
+            questionIndex=question_index,
+            totalPlayers=len(self.players),
+            answeredCount=answered_count,
+            distribution=distribution
+        )
+
+    def get_answer_status(self, question_index: int) -> AnswerStatus:
+        """Get which players have/haven't answered the current question"""
+        answered = []
+        waiting = []
+        
+        for player in self.players.values():
+            if question_index in player.answers:
+                answered.append(player.id)
+            else:
+                waiting.append(player.id)
+        
+        return AnswerStatus(answered=answered, waiting=waiting)
 
 
 def generate_session_code(length: int = 6) -> str:

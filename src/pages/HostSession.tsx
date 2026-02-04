@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
-import { SessionState, ServerMessage, RevealResults } from '../types'
+import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry } from '../types'
 
 export default function HostSession() {
   const { code } = useParams<{ code: string }>()
@@ -15,6 +15,13 @@ export default function HostSession() {
   const [loading, setLoading] = useState(false)
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling' | null>(null)
   const connectionRef = useRef<{ send: (data: unknown) => void; close: () => void } | null>(null)
+  
+  // New state for enhanced features
+  const [leaderboard, setLeaderboard] = useState<LiveLeaderboardEntry[]>([])
+  const [answerStatus, setAnswerStatus] = useState<{ answered: string[]; waiting: string[] }>({ answered: [], waiting: [] })
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [showAnswerDetails, setShowAnswerDetails] = useState(false)
   
   const hostToken = sessionStorage.getItem(`host_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
@@ -29,6 +36,9 @@ export default function HostSession() {
       switch (msg.type) {
         case 'session_state':
           setSession(msg.state)
+          if (msg.state.timerRemaining !== undefined) {
+            setTimerRemaining(msg.state.timerRemaining)
+          }
           break
         case 'player_joined':
           setSession(prev => prev ? {
@@ -55,6 +65,10 @@ export default function HostSession() {
               )
             }
           })
+          // Update answer status if provided
+          if (msg.answerStatus) {
+            setAnswerStatus(msg.answerStatus)
+          }
           break
         case 'question_started':
           setSession(prev => prev ? {
@@ -62,10 +76,19 @@ export default function HostSession() {
             status: 'playing',
             currentQuestionIndex: msg.questionIndex
           } : null)
+          // Reset answer status for new question
+          setAnswerStatus({ answered: [], waiting: [] })
           break
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
           setResults(msg.results)
+          setTimerRemaining(null)
+          break
+        case 'timer_tick':
+          setTimerRemaining(msg.remaining)
+          break
+        case 'leaderboard_update':
+          setLeaderboard(msg.leaderboard)
           break
         case 'error':
           setError(msg.message)
@@ -185,6 +208,9 @@ export default function HostSession() {
 
           <div className="text-center text-white/60">
             <p>{session.questions.length} questions loaded</p>
+            {session.settings?.timerMode && (
+              <p className="text-secondary mt-1">⏱️ Timer mode: {session.settings.timerSeconds}s per question</p>
+            )}
           </div>
 
           <button
@@ -200,7 +226,7 @@ export default function HostSession() {
       {/* Playing State */}
       {session.status === 'playing' && currentQuestion && (
         <div className="space-y-6 animate-slide-up">
-          {/* Progress */}
+          {/* Progress & Timer */}
           <div className="flex items-center gap-4">
             <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
               <div 
@@ -212,6 +238,36 @@ export default function HostSession() {
               {session.currentQuestionIndex + 1} / {session.questions.length}
             </span>
           </div>
+
+          {/* Timer Display */}
+          {session.settings?.timerMode && timerRemaining !== null && (
+            <div className="flex justify-center">
+              <div className={`relative w-20 h-20 ${timerRemaining <= 5 ? 'animate-pulse' : ''}`}>
+                <svg className="w-20 h-20 transform -rotate-90">
+                  <circle
+                    cx="40" cy="40" r="36"
+                    stroke="rgba(255,255,255,0.2)"
+                    strokeWidth="8"
+                    fill="none"
+                  />
+                  <circle
+                    cx="40" cy="40" r="36"
+                    stroke={timerRemaining <= 5 ? '#ef4444' : timerRemaining <= 10 ? '#f59e0b' : '#6366f1'}
+                    strokeWidth="8"
+                    fill="none"
+                    strokeDasharray={`${(timerRemaining / (session.settings?.timerSeconds || 15)) * 226} 226`}
+                    strokeLinecap="round"
+                    className="transition-all duration-1000"
+                  />
+                </svg>
+                <span className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${
+                  timerRemaining <= 5 ? 'text-red-400' : timerRemaining <= 10 ? 'text-yellow-400' : 'text-white'
+                }`}>
+                  {timerRemaining}
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Question */}
           <div className="bg-white/10 rounded-2xl p-6">
@@ -232,46 +288,136 @@ export default function HostSession() {
             </div>
           </div>
 
-          {/* Answer Status */}
-          <div className="bg-white/5 rounded-xl p-4 text-center">
-            <p className="text-white/60">
-              <span className="text-2xl font-bold text-primary">{answeredCount}</span>
-              <span className="mx-1">/</span>
-              <span>{session.players.length}</span>
-              <span className="ml-2">answered</span>
-            </p>
+          {/* Answer Status - Enhanced */}
+          <div className="bg-white/5 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-white/60">
+                <span className="text-2xl font-bold text-primary">{answeredCount}</span>
+                <span className="mx-1">/</span>
+                <span>{session.players.length}</span>
+                <span className="ml-2">answered</span>
+              </p>
+              <button
+                onClick={() => setShowAnswerDetails(!showAnswerDetails)}
+                className="text-sm text-white/60 hover:text-white underline"
+              >
+                {showAnswerDetails ? 'Hide' : 'Show'} details
+              </button>
+            </div>
+            
+            {showAnswerDetails && (
+              <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-green-400 text-sm font-medium mb-2">✓ Answered ({answerStatus.answered.length})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {session.players
+                      .filter(p => p.answers[session.currentQuestionIndex] !== undefined || answerStatus.answered.includes(p.id))
+                      .map(p => (
+                        <span key={p.id} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs">
+                          {p.nickname}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-yellow-400 text-sm font-medium mb-2">⏳ Waiting ({session.players.length - answeredCount})</p>
+                  <div className="flex flex-wrap gap-1">
+                    {session.players
+                      .filter(p => p.answers[session.currentQuestionIndex] === undefined && !answerStatus.answered.includes(p.id))
+                      .map(p => (
+                        <span key={p.id} className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 rounded text-xs">
+                          {p.nickname}
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Controls */}
-          <div className="flex gap-4">
-            {!isLastQuestion ? (
+          {/* Live Leaderboard Toggle */}
+          <div className="bg-white/5 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowLeaderboard(!showLeaderboard)}
+              className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+            >
+              <span className="font-medium">📊 Live Leaderboard</span>
+              <span className="text-white/60">{showLeaderboard ? '▲' : '▼'}</span>
+            </button>
+            
+            {showLeaderboard && leaderboard.length > 0 && (
+              <div className="border-t border-white/10">
+                {leaderboard.slice(0, 5).map((entry, i) => (
+                  <div key={entry.id} className={`flex items-center p-3 ${i > 0 ? 'border-t border-white/10' : ''}`}>
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
+                      i === 0 ? 'bg-yellow-500 text-black' :
+                      i === 1 ? 'bg-gray-300 text-black' :
+                      i === 2 ? 'bg-amber-700 text-white' :
+                      'bg-white/20'
+                    }`}>
+                      {entry.rank}
+                    </span>
+                    <span className="flex-1 truncate">{entry.nickname}</span>
+                    <span className="text-sm text-white/60 mr-2">{entry.correctAnswers}/{entry.totalAnswers}</span>
+                    <span className="font-bold text-primary">{entry.score}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Controls - hide manual controls if timer mode is active */}
+          {!session.settings?.timerMode && (
+            <div className="flex gap-4">
+              {!isLastQuestion ? (
+                <button
+                  onClick={handleNext}
+                  disabled={loading}
+                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all disabled:opacity-50"
+                >
+                  Next Question →
+                </button>
+              ) : (
+                <button
+                  onClick={handleReveal}
+                  disabled={loading}
+                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50"
+                >
+                  🏆 Reveal Results
+                </button>
+              )}
+              
+              {!isLastQuestion && (
+                <button
+                  onClick={handleReveal}
+                  disabled={loading}
+                  className="py-4 px-6 text-lg font-bold rounded-2xl bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
+                >
+                  End Early
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Manual override in timer mode */}
+          {session.settings?.timerMode && (
+            <div className="flex gap-4">
               <button
                 onClick={handleNext}
-                disabled={loading}
-                className="flex-1 py-4 text-lg font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all disabled:opacity-50"
+                disabled={loading || isLastQuestion}
+                className="flex-1 py-3 text-sm font-medium rounded-xl bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
               >
-                Next Question →
+                Skip to Next →
               </button>
-            ) : (
               <button
                 onClick={handleReveal}
                 disabled={loading}
-                className="flex-1 py-4 text-lg font-bold rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50"
-              >
-                🏆 Reveal Results
-              </button>
-            )}
-            
-            {!isLastQuestion && (
-              <button
-                onClick={handleReveal}
-                disabled={loading}
-                className="py-4 px-6 text-lg font-bold rounded-2xl bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
+                className="py-3 px-4 text-sm font-medium rounded-xl bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition-all disabled:opacity-50"
               >
                 End Early
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
 

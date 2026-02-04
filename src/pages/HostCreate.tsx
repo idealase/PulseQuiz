@@ -18,6 +18,10 @@ export default function HostCreate() {
   const [error, setError] = useState<string | null>(null)
   const [csvErrors, setCsvErrors] = useState<string[]>([])
   const [dragActive, setDragActive] = useState(false)
+  
+  // Timer settings
+  const [timerMode, setTimerMode] = useState(false)
+  const [timerSeconds, setTimerSeconds] = useState(15)
 
   const api = new ApiClient(config.apiBaseUrl)
 
@@ -25,7 +29,10 @@ export default function HostCreate() {
     setLoading(true)
     setError(null)
     try {
-      const result = await api.createSession()
+      const result = await api.createSession({ 
+        timerMode, 
+        timerSeconds: timerMode ? timerSeconds : 15 
+      })
       setSessionCode(result.code)
       setHostToken(result.hostToken)
     } catch (e) {
@@ -96,6 +103,43 @@ export default function HostCreate() {
 
       {!sessionCode ? (
         <div className="space-y-6 animate-slide-up">
+          {/* Timer Mode Settings */}
+          <div className="bg-white/10 rounded-2xl p-6">
+            <h2 className="text-lg font-bold mb-4">Game Settings</h2>
+            
+            <label className="flex items-center gap-3 cursor-pointer mb-4">
+              <input
+                type="checkbox"
+                checked={timerMode}
+                onChange={(e) => setTimerMode(e.target.checked)}
+                className="w-5 h-5 rounded accent-primary"
+              />
+              <span className="font-medium">⏱️ Auto-advance Timer Mode</span>
+            </label>
+            
+            {timerMode && (
+              <div className="ml-8 space-y-2">
+                <label className="text-white/60 text-sm">Seconds per question:</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min="5"
+                    max="60"
+                    value={timerSeconds}
+                    onChange={(e) => setTimerSeconds(Number(e.target.value))}
+                    className="flex-1 accent-primary"
+                  />
+                  <span className="w-12 text-center font-mono text-lg font-bold text-secondary">
+                    {timerSeconds}s
+                  </span>
+                </div>
+                <p className="text-white/40 text-xs">
+                  Questions auto-advance when timer runs out
+                </p>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={handleCreateSession}
             disabled={loading}

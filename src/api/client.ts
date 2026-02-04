@@ -1,4 +1,9 @@
-import { Question } from '../types'
+import { Question, LiveLeaderboardEntry, QuestionStats, AnswerStatusWithNames } from '../types'
+
+interface CreateSessionRequest {
+  timerMode?: boolean
+  timerSeconds?: number
+}
 
 interface CreateSessionResponse {
   code: string
@@ -7,6 +12,10 @@ interface CreateSessionResponse {
 
 interface JoinSessionResponse {
   playerId: string
+}
+
+interface ObserveSessionResponse {
+  observerId: string
 }
 
 interface PollEvent {
@@ -43,14 +52,23 @@ export class ApiClient {
     return response.json()
   }
 
-  async createSession(): Promise<CreateSessionResponse> {
-    return this.request('/api/session', { method: 'POST' })
+  async createSession(options?: CreateSessionRequest): Promise<CreateSessionResponse> {
+    return this.request('/api/session', { 
+      method: 'POST',
+      body: JSON.stringify(options || {})
+    })
   }
 
   async joinSession(code: string, nickname: string): Promise<JoinSessionResponse> {
     return this.request(`/api/session/${code}/join`, {
       method: 'POST',
       body: JSON.stringify({ nickname }),
+    })
+  }
+
+  async observeSession(code: string): Promise<ObserveSessionResponse> {
+    return this.request(`/api/session/${code}/observe`, {
+      method: 'POST',
     })
   }
 
@@ -90,6 +108,20 @@ export class ApiClient {
     })
   }
 
+  async getLeaderboard(code: string): Promise<{ leaderboard: LiveLeaderboardEntry[] }> {
+    return this.request(`/api/session/${code}/leaderboard`)
+  }
+
+  async getQuestionStats(code: string, questionIndex: number): Promise<{ stats: QuestionStats }> {
+    return this.request(`/api/session/${code}/stats/${questionIndex}`)
+  }
+
+  async getAnswerStatus(code: string, hostToken: string): Promise<AnswerStatusWithNames> {
+    return this.request(`/api/session/${code}/answer-status`, {
+      headers: { 'X-Host-Token': hostToken },
+    })
+  }
+
   getWebSocketUrl(code: string): string {
     // If baseUrl is empty (same-origin proxy), construct from window.location
     if (!this.baseUrl) {
@@ -102,9 +134,10 @@ export class ApiClient {
 
   // --- Polling Fallback Methods (for Zscaler/corporate networks) ---
 
-  async getSessionState(code: string, auth: { hostToken?: string; playerId?: string }): Promise<unknown> {
+  async getSessionState(code: string, auth: { hostToken?: string; playerId?: string; observerId?: string }): Promise<unknown> {
     const params = new URLSearchParams()
     if (auth.playerId) params.set('player_id', auth.playerId)
+    if (auth.observerId) params.set('observer_id', auth.observerId)
     
     const headers: Record<string, string> = {}
     if (auth.hostToken) headers['X-Host-Token'] = auth.hostToken
@@ -115,11 +148,12 @@ export class ApiClient {
   async pollEvents(
     code: string, 
     sinceId: number, 
-    auth: { hostToken?: string; playerId?: string }
+    auth: { hostToken?: string; playerId?: string; observerId?: string }
   ): Promise<PollEventsResponse> {
     const params = new URLSearchParams()
     params.set('since_id', sinceId.toString())
     if (auth.playerId) params.set('player_id', auth.playerId)
+    if (auth.observerId) params.set('observer_id', auth.observerId)
     
     const headers: Record<string, string> = {}
     if (auth.hostToken) headers['X-Host-Token'] = auth.hostToken
@@ -140,7 +174,7 @@ export class PollingConnection {
   constructor(
     private client: ApiClient,
     private code: string,
-    private auth: { hostToken?: string; playerId?: string },
+    private auth: { hostToken?: string; playerId?: string; observerId?: string },
     private intervalMs = 1000  // Poll every second
   ) {}
 
@@ -202,7 +236,7 @@ export class PollingConnection {
 export function createSmartConnection(
   client: ApiClient,
   code: string,
-  auth: { hostToken?: string; playerId?: string },
+  auth: { hostToken?: string; playerId?: string; observerId?: string },
   onMessage: (data: unknown) => void,
   onError?: (error: Error) => void,
   onConnectionModeChange?: (mode: 'websocket' | 'polling') => void
@@ -243,6 +277,8 @@ export function createSmartConnection(
       ws?.send(JSON.stringify({ type: 'identify_host', hostToken: auth.hostToken }))
     } else if (auth.playerId) {
       ws?.send(JSON.stringify({ type: 'identify_player', playerId: auth.playerId }))
+    } else if (auth.observerId) {
+      ws?.send(JSON.stringify({ type: 'identify_observer', observerId: auth.observerId }))
     }
   }
 

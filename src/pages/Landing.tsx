@@ -26,6 +26,13 @@ export default function Landing() {
         >
           Host Game
         </Link>
+        
+        <Link
+          to="/watch"
+          className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30 hover:border-purple-500 text-purple-300 transition-all duration-300 hover:scale-105 active:scale-95"
+        >
+          👀 Watch Game
+        </Link>
       </div>
 
       <div className="mt-12 text-white/40 text-sm text-center">

@@ -18,6 +18,10 @@ export default function PlayerSession() {
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling' | null>(null)
   const connectionRef = useRef<{ send: (data: unknown) => void; close: () => void } | null>(null)
   
+  // New state for enhanced features
+  const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
+  const [myRank, setMyRank] = useState<number | null>(null)
+  
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
@@ -32,6 +36,9 @@ export default function PlayerSession() {
       switch (msg.type) {
         case 'session_state':
           setSession(msg.state)
+          if (msg.state.timerRemaining !== undefined) {
+            setTimerRemaining(msg.state.timerRemaining)
+          }
           break
         case 'question_started':
           setSession(prev => prev ? {
@@ -46,6 +53,7 @@ export default function PlayerSession() {
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
           setResults(msg.results)
+          setTimerRemaining(null)
           // Find my results
           const myPlayer = msg.results.players.find(p => p.id === playerId)
           if (myPlayer) {
@@ -53,9 +61,34 @@ export default function PlayerSession() {
             setMyResults(msg.results.questions)
           }
           break
+        case 'timer_tick':
+          setTimerRemaining(msg.remaining)
+          // Auto-lock if timer expired and answer not locked
+          if (msg.remaining === 0 && !answerLocked && selectedAnswer !== null) {
+            // Auto-submit the selected answer
+            handleAutoSubmit()
+          }
+          break
+        case 'leaderboard_update':
+          // Update my rank from leaderboard
+          const myEntry = msg.leaderboard.find(e => e.id === playerId)
+          if (myEntry) {
+            setMyRank(myEntry.rank)
+          }
+          break
         case 'error':
           setError(msg.message)
           break
+      }
+    }
+
+    const handleAutoSubmit = async () => {
+      if (selectedAnswer === null || !code || !playerId || !session) return
+      setAnswerLocked(true)
+      try {
+        await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+      } catch {
+        // Silent fail on auto-submit
       }
     }
 
@@ -77,6 +110,8 @@ export default function PlayerSession() {
 
   const handleSelectAnswer = (choice: number) => {
     if (answerLocked) return
+    // Don't allow selection if timer has expired
+    if (session?.settings?.timerMode && timerRemaining === 0) return
     setSelectedAnswer(choice)
   }
 
@@ -104,6 +139,13 @@ export default function PlayerSession() {
   const currentQuestion = session.status === 'playing' && session.questions[session.currentQuestionIndex]
   const myScore = results?.players.find(p => p.id === playerId)
 
+  // Helper to get ordinal suffix
+  const getOrdinal = (n: number) => {
+    const s = ['th', 'st', 'nd', 'rd']
+    const v = n % 100
+    return n + (s[(v - 20) % 10] || s[v] || s[0])
+  }
+
   // Option colors for visual variety
   const optionColors = [
     'from-red-500 to-red-600',
@@ -119,13 +161,31 @@ export default function PlayerSession() {
         <div>
           <span className="text-white/60 text-sm">Playing as</span>
           <p className="font-bold">{nickname}</p>
+          {/* Show current rank during play */}
+          {session.status === 'playing' && myRank !== null && (
+            <p className="text-sm text-secondary">
+              {myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '📊'} {getOrdinal(myRank)} place
+            </p>
+          )}
         </div>
-        {session.status === 'playing' && (
-          <div className="text-right">
-            <span className="text-white/60 text-sm">Question</span>
-            <p className="font-bold">{session.currentQuestionIndex + 1} / {session.questions.length}</p>
-          </div>
-        )}
+        <div className="text-right flex items-center gap-4">
+          {/* Timer */}
+          {session.status === 'playing' && session.settings?.timerMode && timerRemaining !== null && (
+            <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
+              timerRemaining <= 5 ? 'bg-red-500/30 text-red-300 animate-pulse' :
+              timerRemaining <= 10 ? 'bg-yellow-500/30 text-yellow-300' :
+              'bg-white/10'
+            }`}>
+              {timerRemaining}
+            </div>
+          )}
+          {session.status === 'playing' && (
+            <div>
+              <span className="text-white/60 text-sm">Question</span>
+              <p className="font-bold">{session.currentQuestionIndex + 1} / {session.questions.length}</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Connection mode indicator */}
@@ -159,6 +219,13 @@ export default function PlayerSession() {
       {/* Playing State */}
       {session.status === 'playing' && currentQuestion && (
         <div className="flex-1 flex flex-col animate-slide-up">
+          {/* Timer expired warning */}
+          {session.settings?.timerMode && timerRemaining === 0 && !answerLocked && (
+            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300 text-center animate-pulse">
+              ⏰ Time's up! Waiting for next question...
+            </div>
+          )}
+
           {/* Question */}
           <div className="bg-white/10 rounded-2xl p-5 mb-4">
             <h2 className="text-lg md:text-xl font-bold text-center">
@@ -168,29 +235,34 @@ export default function PlayerSession() {
 
           {/* Options */}
           <div className="flex-1 grid grid-cols-1 gap-3">
-            {currentQuestion.options.map((opt, i) => (
-              <button
-                key={i}
-                onClick={() => handleSelectAnswer(i)}
-                disabled={answerLocked}
-                className={`p-4 rounded-xl text-left font-medium transition-all active:scale-98 ${
-                  answerLocked 
-                    ? selectedAnswer === i 
-                      ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
-                      : 'bg-white/5 opacity-50'
-                    : selectedAnswer === i
-                      ? `bg-gradient-to-r ${optionColors[i]} ring-4 ring-white/50`
-                      : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
-                }`}
-              >
-                <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                {opt}
-              </button>
-            ))}
+            {currentQuestion.options.map((opt, i) => {
+              const timerExpired = session.settings?.timerMode && timerRemaining === 0
+              const isDisabled = answerLocked || timerExpired
+              
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleSelectAnswer(i)}
+                  disabled={isDisabled}
+                  className={`p-4 rounded-xl text-left font-medium transition-all active:scale-98 ${
+                    isDisabled 
+                      ? selectedAnswer === i 
+                        ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
+                        : 'bg-white/5 opacity-50'
+                      : selectedAnswer === i
+                        ? `bg-gradient-to-r ${optionColors[i]} ring-4 ring-white/50`
+                        : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
+                  }`}
+                >
+                  <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                  {opt}
+                </button>
+              )
+            })}
           </div>
 
           {/* Confirm Button */}
-          {!answerLocked ? (
+          {!answerLocked && !(session.settings?.timerMode && timerRemaining === 0) ? (
             <button
               onClick={handleConfirmAnswer}
               disabled={selectedAnswer === null}
@@ -198,9 +270,13 @@ export default function PlayerSession() {
             >
               Lock In Answer
             </button>
-          ) : (
+          ) : answerLocked ? (
             <div className="mt-4 py-4 text-lg font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500">
               ✓ Answer Locked
+            </div>
+          ) : (
+            <div className="mt-4 py-4 text-lg font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300">
+              ⏰ Time Expired
             </div>
           )}
         </div>
