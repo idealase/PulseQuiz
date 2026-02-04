@@ -1,7 +1,10 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
+from pathlib import Path
 import json
 import asyncio
 import time
@@ -488,6 +491,35 @@ async def get_session_events(
     }
 
 
+# --- Static File Serving (for self-hosted deployment) ---
+
+# Path to frontend build (../dist from backend folder)
+FRONTEND_DIR = Path(__file__).parent.parent / "dist"
+
+# Serve static assets if frontend is built
+if FRONTEND_DIR.exists():
+    # Mount static assets (js, css, etc)
+    app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
+    
+    # Serve index.html for all non-API routes (SPA support)
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        # Don't intercept API or WebSocket routes
+        if full_path.startswith("api/") or full_path.startswith("ws/"):
+            raise HTTPException(status_code=404)
+        
+        # Try to serve the exact file first
+        file_path = FRONTEND_DIR / full_path
+        if file_path.is_file():
+            return FileResponse(file_path)
+        
+        # Otherwise serve index.html (SPA routing)
+        return FileResponse(FRONTEND_DIR / "index.html")
+
+
 if __name__ == "__main__":
     import uvicorn
+    print(f"\n🎮 PulseQuiz Server")
+    print(f"   Frontend: {'✅ Built' if FRONTEND_DIR.exists() else '❌ Not built (run: npm run build)'}")
+    print(f"   URL: http://localhost:8000\n")
     uvicorn.run(app, host="0.0.0.0", port=8000)
