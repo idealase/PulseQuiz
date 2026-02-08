@@ -262,6 +262,23 @@ def find_copilot_cli() -> Optional[str]:
     if cli_path and os.path.exists(cli_path):
         return cli_path
     
+    # Check for bundled CLI from github-copilot-sdk package
+    if COPILOT_SDK_AVAILABLE:
+        try:
+            import copilot
+            sdk_cli_path = Path(copilot.__file__).parent / "bin" / "copilot"
+            if sdk_cli_path.exists():
+                # Ensure it's executable
+                if not os.access(sdk_cli_path, os.X_OK):
+                    try:
+                        os.chmod(sdk_cli_path, 0o755)
+                        logger.info(f"✓ Made SDK CLI executable: {sdk_cli_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️  Could not make SDK CLI executable: {e}")
+                return str(sdk_cli_path)
+        except Exception as e:
+            logger.debug(f"Could not find SDK bundled CLI: {e}")
+    
     # Known Windows locations - prefer the actual exe
     possible_paths = [
         r"C:\Users\brodi\AppData\Local\Microsoft\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\copilot.exe",
