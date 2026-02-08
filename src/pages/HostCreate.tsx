@@ -107,7 +107,10 @@ export default function HostCreate() {
         sessionStorage.setItem(`dynamic_${sessionCode}`, JSON.stringify({
           enabled: true,
           topics: aiTopics,
-          authToken: aiAuthToken
+          authToken: aiAuthToken,
+          targetCount: aiQuestionCount,
+          batchSize: 5,
+          currentBatch: 1
         }))
       }
       navigate(`/host/${sessionCode}`)
@@ -138,9 +141,13 @@ export default function HostCreate() {
     setCsvErrors([])
     
     try {
+      // In dynamic mode, generate only initial batch of 5 questions
+      // The rest will be generated during gameplay based on performance
+      const initialBatchSize = aiDynamicMode ? 5 : aiQuestionCount
+      
       const result = await api.generateQuestions({
         topics: aiTopics,
-        count: aiQuestionCount,
+        count: initialBatchSize,
         research_mode: aiResearchMode,
         difficulty: 'mixed'
       }, aiAuthToken)
@@ -148,7 +155,9 @@ export default function HostCreate() {
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
       
-      if (result.questions.length < aiQuestionCount) {
+      if (aiDynamicMode) {
+        setCsvErrors([`Generated initial batch of ${result.questions.length} questions. More will be generated during gameplay (target: ${aiQuestionCount} total).`])
+      } else if (result.questions.length < aiQuestionCount) {
         setCsvErrors([`Generated ${result.questions.length} of ${aiQuestionCount} requested questions`])
       }
     } catch (e) {
