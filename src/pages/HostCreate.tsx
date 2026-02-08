@@ -156,7 +156,7 @@ export default function HostCreate() {
       setGenerationTime(result.generation_time_ms)
       
       if (aiDynamicMode) {
-        setCsvErrors([`Generated initial batch of ${result.questions.length} questions. More will be generated during gameplay (target: ${aiQuestionCount} total).`])
+        setCsvErrors([`Dynamic Mode: Generated initial batch of ${result.questions.length} questions (requested: ${initialBatchSize}). Target: ${aiQuestionCount} total. More will be generated during gameplay.`])
       } else if (result.questions.length < aiQuestionCount) {
         setCsvErrors([`Generated ${result.questions.length} of ${aiQuestionCount} requested questions`])
       }
