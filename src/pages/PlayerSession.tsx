@@ -241,7 +241,7 @@ export default function PlayerSession() {
           </div>
 
           {/* Options */}
-          <div className="flex-1 grid grid-cols-1 gap-2 min-h-0 auto-rows-fr">
+          <div className="flex-1 grid grid-cols-1 gap-1 min-h-0 auto-rows-min">
             {currentQuestion.options.map((opt, i) => {
               const timerExpired = session.settings?.timerMode && timerRemaining === 0
               const isDisabled = answerLocked || timerExpired
@@ -251,7 +251,7 @@ export default function PlayerSession() {
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium transition-all active:scale-98 flex items-center ${
+                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium leading-tight transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
                         ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
@@ -262,7 +262,7 @@ export default function PlayerSession() {
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
-                  <span className="line-clamp-2">{opt}</span>
+                  <span className="line-clamp-1 md:line-clamp-2">{opt}</span>
                 </button>
               )
             })}

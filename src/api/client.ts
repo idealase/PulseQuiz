@@ -47,13 +47,6 @@ interface GenerateQuestionsResponse {
   generation_time_ms: number
 }
 
-interface PerformanceData {
-  avg_score_percent: number
-  avg_response_time_ms: number
-  player_count: number
-  questions_answered: number
-}
-
 interface GenerateDynamicBatchRequest {
   topics: string
   session_code: string
