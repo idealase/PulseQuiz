@@ -110,7 +110,8 @@ export default function HostCreate() {
           authToken: aiAuthToken,
           targetCount: aiQuestionCount,
           batchSize: 5,
-          currentBatch: 1
+          currentBatch: 1,
+          lastDifficulty: 'medium'
         }))
       }
       navigate(`/host/${sessionCode}`)

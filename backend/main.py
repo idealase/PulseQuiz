@@ -275,7 +275,12 @@ def find_copilot_cli() -> Optional[str]:
                         logger.info(f"✓ Made SDK CLI executable: {sdk_cli_path}")
                     except Exception as e:
                         logger.warning(f"⚠️  Could not make SDK CLI executable: {e}")
-                return str(sdk_cli_path)
+                
+                # Only return if executable
+                if os.access(sdk_cli_path, os.X_OK):
+                    return str(sdk_cli_path)
+                else:
+                    logger.warning(f"⚠️  SDK CLI at {sdk_cli_path} is not executable; skipping this path")
         except Exception as e:
             logger.debug(f"Could not find SDK bundled CLI: {e}")
     
@@ -1388,8 +1393,15 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
             
             logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={confidence}")
             
+            # Parse verified value - handle string/bool variations
+            verified_value = data.get('verified', False)
+            if isinstance(verified_value, str):
+                verified = verified_value.lower() in ('true', '1', 'yes')
+            else:
+                verified = bool(verified_value)
+            
             return FactCheckResponse(
-                verified=bool(data.get('verified', False)),
+                verified=verified,
                 confidence=confidence,
                 explanation=str(data.get('explanation', 'Unable to verify')),
                 source_hint=str(data.get('source_hint')) if data.get('source_hint') else None
