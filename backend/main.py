@@ -309,16 +309,26 @@ async def generate_with_copilot(
     logger.info("🤖 [Copilot CLI] STARTING AI GENERATION")
     logger.info("=" * 60)
     
+    # Validate model name (basic sanity check)
+    valid_models = [
+        "claude-sonnet-4.5", "claude-haiku-4.5", "claude-opus-4.5", "claude-sonnet-4",
+        "gemini-3-pro-preview", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1-codex-max",
+        "gpt-5.1-codex", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1"
+    ]
+    if model not in valid_models:
+        logger.warning(f"⚠️  Unrecognized model: {model}, using default gpt-4.1")
+        model = "gpt-4.1"
+    
     cli_path = find_copilot_cli()
     if not cli_path:
         logger.error("❌ Copilot CLI not found!")
         raise HTTPException(
             status_code=503, 
-            detail="Copilot CLI not found. Install with: winget install GitHub.Copilot"
+            detail="Copilot CLI not found. Install github-copilot-sdk: pip install github-copilot-sdk"
         )
     
     logger.info(f"🔧 CLI Path: {cli_path}")
-    logger.info(f"🎯 Model requested: {model}")
+    logger.info(f"🎯 Model: {model}")
     logger.info(f"📝 System message: {system_message[:100]}...")
     logger.info(f"📝 Prompt ({len(prompt)} chars): {prompt[:200]}...")
     
@@ -369,6 +379,14 @@ USER REQUEST:
         if process.returncode != 0:
             logger.error(f"❌ CLI returned non-zero exit code: {process.returncode}")
             logger.error(f"   stderr: {stderr_text}")
+            
+            # Check for authentication errors
+            if "No authentication information found" in stderr_text or "authentication" in stderr_text.lower():
+                raise HTTPException(
+                    status_code=401,
+                    detail="Copilot authentication required. Set GITHUB_TOKEN, GH_TOKEN, or COPILOT_GITHUB_TOKEN environment variable, or run 'copilot' and use the '/login' command."
+                )
+            
             raise RuntimeError(f"Copilot CLI failed with exit code {process.returncode}: {stderr_text[:200]}")
         
         if stdout_text:
@@ -1179,7 +1197,14 @@ async def generate_questions(
     if not verify_auth_token(x_auth_token):
         raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
     
-    logger.info(f"🎯 Generate request: topics='{request.topics}', count={request.count}, research={request.research_mode}")
+    # Validate topics input
+    topics = request.topics.strip()
+    if not topics:
+        raise HTTPException(status_code=400, detail="Topics cannot be empty")
+    if len(topics) > 500:
+        raise HTTPException(status_code=400, detail="Topics too long (max 500 characters)")
+    
+    logger.info(f"🎯 Generate request: topics='{topics}', count={request.count}, research={request.research_mode}")
     start_time = time.time()
     
     # Build the prompt
@@ -1191,7 +1216,7 @@ async def generate_questions(
     if request.research_mode:
         research_instruction = "\nPlease research these topics thoroughly before generating questions. Include interesting and lesser-known facts."
     
-    prompt = f"""Generate {request.count} multiple-choice quiz questions about the following topics: {request.topics}
+    prompt = f"""Generate {request.count} multiple-choice quiz questions about the following topics: {topics}
 {difficulty_instruction}{research_instruction}
 
 Remember to output ONLY valid JSON with the questions array."""
@@ -1336,24 +1361,50 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
             system_message="You are a fact-checker. Verify trivia answers accurately and concisely. Output ONLY valid JSON."
         )
         
-        # Parse the response
+        # Parse the response - try to extract JSON
+        # First try to find JSON in markdown code blocks
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+        if json_match:
+            content = json_match.group(1).strip()
+        
+        # Then try to find JSON object
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
-            data = json.loads(json_match.group())
+            try:
+                data = json.loads(json_match.group())
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Failed to parse JSON from fact-check response: {e}")
+                logger.error(f"   Content: {content[:200]}...")
+                raise ValueError(f"Invalid JSON in response: {e}")
             
-            logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={data.get('confidence')}")
+            # Validate and clamp confidence value
+            confidence = data.get('confidence', 0.5)
+            try:
+                confidence = float(confidence)
+                confidence = max(0.0, min(1.0, confidence))  # Clamp to [0.0, 1.0]
+            except (ValueError, TypeError):
+                logger.warning(f"⚠️  Invalid confidence value: {confidence}, defaulting to 0.5")
+                confidence = 0.5
+            
+            logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={confidence}")
             
             return FactCheckResponse(
-                verified=data.get('verified', False),
-                confidence=float(data.get('confidence', 0.5)),
-                explanation=data.get('explanation', 'Unable to verify'),
-                source_hint=data.get('source_hint')
+                verified=bool(data.get('verified', False)),
+                confidence=confidence,
+                explanation=str(data.get('explanation', 'Unable to verify')),
+                source_hint=str(data.get('source_hint')) if data.get('source_hint') else None
             )
         else:
+            logger.error(f"❌ No JSON found in fact-check response")
+            logger.error(f"   Content: {content[:200]}...")
             raise ValueError("No JSON found in response")
             
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"❌ Fact-check failed: {e}")
+        logger.error(f"   Exception type: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Fact-check failed: {str(e)}")
 
 
