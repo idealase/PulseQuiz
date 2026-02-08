@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
@@ -206,7 +206,7 @@ export default function HostSession() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <span className="text-white/60 text-sm">Session</span>
+          <Link to="/" className="text-white/60 hover:text-white text-sm">← Home</Link>
           <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
         </div>
         <div className="text-right">
@@ -543,6 +543,22 @@ export default function HostSession() {
           <p className="text-center text-white/40 text-sm">
             Ties broken by fastest total answer time ⚡
           </p>
+
+          {/* Post-Game Actions */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Link
+              to="/host"
+              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all hover:scale-105 active:scale-95"
+            >
+              🎮 Host New Game
+            </Link>
+            <Link
+              to="/"
+              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
+            >
+              🏠 Home
+            </Link>
+          </div>
 
           {/* Questions Review */}
           <div className="space-y-4">
