@@ -13,6 +13,9 @@ venv/
 env/
 .venv/
 
+# TypeScript build info
+tsconfig.tsbuildinfo
+
 # IDE
 .idea/
 .vscode/
