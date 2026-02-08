@@ -346,9 +346,11 @@ USER REQUEST:
         tracker.finish(success=False, error="Copilot CLI not found")
         raise HTTPException(
             status_code=503,
-            detail="Copilot CLI not found. Install github-copilot-sdk: pip install github-copilot-sdk"
+            detail=(
+                "Copilot CLI not found. Install github-copilot-sdk (pip install github-copilot-sdk) "
+                "or GitHub.Copilot (winget install GitHub.Copilot)."
+            )
         )
-
     copilot_log.info("CLI Path: %s", cli_path)
     copilot_log.info("Model: %s  |  Prompt chars: %d", model, len(full_prompt))
 
@@ -398,7 +400,6 @@ USER REQUEST:
                     status_code=401,
                     detail=err_msg + " Or run 'copilot' and use the '/login' command."
                 )
-            
             err_msg = f"Copilot CLI exit code {process.returncode}: {stderr_text[:200]}"
             tracker.finish(
                 success=False,
