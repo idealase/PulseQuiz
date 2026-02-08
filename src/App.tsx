@@ -7,6 +7,7 @@ import PlayerJoin from './pages/PlayerJoin'
 import PlayerSession from './pages/PlayerSession'
 import AudienceJoin from './pages/AudienceJoin'
 import AudienceSession from './pages/AudienceSession'
+import SoloPlay from './pages/SoloPlay'
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
       <div className="min-h-screen text-white">
         <Routes>
           <Route path="/" element={<Landing />} />
+          <Route path="/solo" element={<SoloPlay />} />
           <Route path="/host" element={<HostCreate />} />
           <Route path="/host/:code" element={<HostSession />} />
           <Route path="/join" element={<PlayerJoin />} />

@@ -18,6 +18,9 @@ export default function AudienceSession() {
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling' | null>(null)
   const connectionRef = useRef<{ send: (data: unknown) => void; close: () => void } | null>(null)
   
+  // Hide live stats to prevent players from gaming the system
+  const [hideStats, setHideStats] = useState(() => localStorage.getItem('audience_hide_stats') === 'true')
+  
   const observerId = sessionStorage.getItem(`observer_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
 
@@ -150,6 +153,24 @@ export default function AudienceSession() {
         </div>
       </div>
 
+      {/* Hide Stats Toggle - for preventing players from gaming the system */}
+      <div className="mb-4 flex justify-end">
+        <button
+          onClick={() => {
+            const newValue = !hideStats
+            setHideStats(newValue)
+            localStorage.setItem('audience_hide_stats', String(newValue))
+          }}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            hideStats 
+              ? 'bg-orange-500/20 border border-orange-500/50 text-orange-300' 
+              : 'bg-white/10 border border-white/20 text-white/60 hover:bg-white/20'
+          }`}
+        >
+          {hideStats ? '🙈 Stats Hidden' : '👁️ Showing Stats'}
+        </button>
+      </div>
+
       {/* Connection mode indicator */}
       {connectionMode === 'polling' && (
         <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
@@ -207,44 +228,54 @@ export default function AudienceSession() {
               </div>
 
               {/* Live Answer Statistics */}
-              <div className="bg-white/5 rounded-2xl p-6">
-                <h3 className="font-bold mb-4 flex items-center justify-between">
-                  <span>📊 Live Responses</span>
-                  <span className="text-sm font-normal text-white/60">
-                    {questionStats?.answeredCount || 0} / {session.players.length} answered
-                  </span>
-                </h3>
-                
-                <div className="space-y-3">
-                  {currentQuestion.options.map((opt, i) => {
-                    const count = questionStats?.distribution[i] || 0
-                    const percentage = getStatPercentage(i)
-                    
-                    return (
-                      <div key={i} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="truncate flex-1 mr-2">
-                            <span className="font-bold">{String.fromCharCode(65 + i)}.</span> {opt}
-                          </span>
-                          <span className="font-mono text-white/60">{count}</span>
-                        </div>
-                        <div className="h-8 bg-white/10 rounded-lg overflow-hidden">
-                          <div 
-                            className={`h-full ${optionColors[i]} transition-all duration-500 flex items-center justify-end pr-2`}
-                            style={{ width: `${Math.max(percentage, 0)}%` }}
-                          >
-                            {percentage > 10 && (
-                              <span className="text-xs font-bold text-white/90">
-                                {percentage.toFixed(0)}%
-                              </span>
-                            )}
+              {!hideStats ? (
+                <div className="bg-white/5 rounded-2xl p-6">
+                  <h3 className="font-bold mb-4 flex items-center justify-between">
+                    <span>📊 Live Responses</span>
+                    <span className="text-sm font-normal text-white/60">
+                      {questionStats?.answeredCount || 0} / {session.players.length} answered
+                    </span>
+                  </h3>
+                  
+                  <div className="space-y-3">
+                    {currentQuestion.options.map((opt, i) => {
+                      const count = questionStats?.distribution[i] || 0
+                      const percentage = getStatPercentage(i)
+                      
+                      return (
+                        <div key={i} className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="truncate flex-1 mr-2">
+                              <span className="font-bold">{String.fromCharCode(65 + i)}.</span> {opt}
+                            </span>
+                            <span className="font-mono text-white/60">{count}</span>
+                          </div>
+                          <div className="h-8 bg-white/10 rounded-lg overflow-hidden">
+                            <div 
+                              className={`h-full ${optionColors[i]} transition-all duration-500 flex items-center justify-end pr-2`}
+                              style={{ width: `${Math.max(percentage, 0)}%` }}
+                            >
+                              {percentage > 10 && (
+                                <span className="text-xs font-bold text-white/90">
+                                  {percentage.toFixed(0)}%
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="bg-white/5 rounded-2xl p-6 text-center">
+                  <div className="text-4xl mb-3">🙈</div>
+                  <p className="text-white/60">Stats hidden to prevent peeking</p>
+                  <p className="text-sm text-white/40 mt-1">
+                    {questionStats?.answeredCount || 0} / {session.players.length} answered
+                  </p>
+                </div>
+              )}
             </div>
           )}
 

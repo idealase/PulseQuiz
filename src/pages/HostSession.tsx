@@ -2,7 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
-import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry } from '../types'
+import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
+
+interface FactCheckResult {
+  verified: boolean
+  confidence: number
+  explanation: string
+  source_hint?: string
+}
 
 export default function HostSession() {
   const { code } = useParams<{ code: string }>()
@@ -22,8 +29,15 @@ export default function HostSession() {
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showAnswerDetails, setShowAnswerDetails] = useState(false)
+  const [questionStats, setQuestionStats] = useState<QuestionStats | null>(null)
+  const [showLiveStats, setShowLiveStats] = useState(true)
+  
+  // Fact-check state
+  const [factCheckResults, setFactCheckResults] = useState<Record<number, FactCheckResult>>({})
+  const [factCheckLoading, setFactCheckLoading] = useState<number | null>(null)
   
   const hostToken = sessionStorage.getItem(`host_${code}`)
+  const authToken = localStorage.getItem('quiz_auth_token') || ''
   const api = new ApiClient(config.apiBaseUrl)
 
   useEffect(() => {
@@ -76,8 +90,9 @@ export default function HostSession() {
             status: 'playing',
             currentQuestionIndex: msg.questionIndex
           } : null)
-          // Reset answer status for new question
+          // Reset answer status and stats for new question
           setAnswerStatus({ answered: [], waiting: [] })
+          setQuestionStats(null)
           break
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
@@ -89,6 +104,9 @@ export default function HostSession() {
           break
         case 'leaderboard_update':
           setLeaderboard(msg.leaderboard)
+          break
+        case 'question_stats':
+          setQuestionStats(msg.stats)
           break
         case 'error':
           setError(msg.message)
@@ -143,6 +161,30 @@ export default function HostSession() {
       setError(e instanceof Error ? e.message : 'Failed to reveal')
     }
     setLoading(false)
+  }
+
+  const handleFactCheck = async (questionIndex: number, question: string, correctAnswer: string, allOptions: string[]) => {
+    if (!authToken) {
+      setError('No auth token - please set access code in Host Create page')
+      return
+    }
+    
+    setFactCheckLoading(questionIndex)
+    try {
+      const result = await api.factCheck({
+        question,
+        claimed_answer: correctAnswer,
+        all_options: allOptions
+      }, authToken)
+      
+      setFactCheckResults(prev => ({
+        ...prev,
+        [questionIndex]: result
+      }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Fact-check failed')
+    }
+    setFactCheckLoading(null)
   }
 
   if (!session) {
@@ -286,6 +328,53 @@ export default function HostSession() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Live Answer Distribution - Host View */}
+          <div className="bg-white/5 rounded-xl overflow-hidden">
+            <button
+              onClick={() => setShowLiveStats(!showLiveStats)}
+              className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+            >
+              <span className="font-medium">📊 Live Answer Distribution</span>
+              <span className="text-white/60">{showLiveStats ? '▲' : '▼'}</span>
+            </button>
+            
+            {showLiveStats && (
+              <div className="p-4 border-t border-white/10 space-y-3">
+                {currentQuestion.options.map((opt, i) => {
+                  const count = questionStats?.distribution[i] || 0
+                  const percentage = questionStats && questionStats.answeredCount > 0
+                    ? (count / questionStats.answeredCount) * 100
+                    : 0
+                  
+                  const optionColors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500']
+                  
+                  return (
+                    <div key={i} className="space-y-1">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="truncate flex-1 mr-2">
+                          <span className="font-bold">{String.fromCharCode(65 + i)}.</span> {opt}
+                        </span>
+                        <span className="font-mono text-white/60">{count}</span>
+                      </div>
+                      <div className="h-6 bg-white/10 rounded-lg overflow-hidden">
+                        <div 
+                          className={`h-full ${optionColors[i]} transition-all duration-500 flex items-center justify-end pr-2`}
+                          style={{ width: `${Math.max(percentage, 0)}%` }}
+                        >
+                          {percentage > 10 && (
+                            <span className="text-xs font-bold text-white/90">
+                              {percentage.toFixed(0)}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
           </div>
 
           {/* Answer Status - Enhanced */}
@@ -472,6 +561,49 @@ export default function HostSession() {
                     💡 {q.explanation}
                   </p>
                 )}
+                
+                {/* Fact-Check Section */}
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  {factCheckResults[i] ? (
+                    <div className={`p-3 rounded-lg ${
+                      factCheckResults[i].verified 
+                        ? 'bg-green-500/10 border border-green-500/30' 
+                        : 'bg-yellow-500/10 border border-yellow-500/30'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{factCheckResults[i].verified ? '✅' : '⚠️'}</span>
+                        <span className={`font-medium ${factCheckResults[i].verified ? 'text-green-400' : 'text-yellow-400'}`}>
+                          {factCheckResults[i].verified ? 'Verified' : 'Uncertain'}
+                        </span>
+                        <span className="text-white/40 text-xs">
+                          ({Math.round(factCheckResults[i].confidence * 100)}% confidence)
+                        </span>
+                      </div>
+                      <p className="text-white/70 text-sm">{factCheckResults[i].explanation}</p>
+                      {factCheckResults[i].source_hint && (
+                        <p className="text-white/40 text-xs mt-1">📚 {factCheckResults[i].source_hint}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleFactCheck(i, q.question, q.options[q.correct], q.options)}
+                      disabled={factCheckLoading === i}
+                      className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                    >
+                      {factCheckLoading === i ? (
+                        <>
+                          <span className="animate-spin">⏳</span>
+                          Checking...
+                        </>
+                      ) : (
+                        <>
+                          <span>🔍</span>
+                          Fact-Check This Answer
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

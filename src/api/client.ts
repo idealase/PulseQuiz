@@ -3,6 +3,8 @@ import { Question, LiveLeaderboardEntry, QuestionStats, AnswerStatusWithNames } 
 interface CreateSessionRequest {
   timerMode?: boolean
   timerSeconds?: number
+  autoProgressMode?: boolean
+  autoProgressPercent?: number
 }
 
 interface CreateSessionResponse {
@@ -28,6 +30,57 @@ interface PollEvent {
 interface PollEventsResponse {
   events: PollEvent[]
   lastEventId: number
+}
+
+// --- AI Generation Types ---
+
+interface GenerateQuestionsRequest {
+  topics: string
+  count?: number
+  research_mode?: boolean
+  difficulty?: 'easy' | 'medium' | 'hard' | 'mixed'
+}
+
+interface GenerateQuestionsResponse {
+  questions: Question[]
+  topics_clarified?: string
+  generation_time_ms: number
+}
+
+interface PerformanceData {
+  avg_score_percent: number
+  avg_response_time_ms: number
+  player_count: number
+  questions_answered: number
+}
+
+interface GenerateDynamicBatchRequest {
+  topics: string
+  session_code: string
+  batch_number: number
+  performance?: PerformanceData
+  previous_difficulty?: string
+  batch_size?: number
+}
+
+interface GenerateDynamicBatchResponse {
+  questions: Question[]
+  suggested_difficulty: string
+  difficulty_reason: string
+  batch_number: number
+}
+
+interface FactCheckRequest {
+  question: string
+  claimed_answer: string
+  all_options: string[]
+}
+
+interface FactCheckResponse {
+  verified: boolean
+  confidence: number
+  explanation: string
+  source_hint?: string
 }
 
 export class ApiClient {
@@ -119,6 +172,46 @@ export class ApiClient {
   async getAnswerStatus(code: string, hostToken: string): Promise<AnswerStatusWithNames> {
     return this.request(`/api/session/${code}/answer-status`, {
       headers: { 'X-Host-Token': hostToken },
+    })
+  }
+
+  // --- AI Generation Methods ---
+
+  async generateQuestions(
+    request: GenerateQuestionsRequest,
+    authToken: string
+  ): Promise<GenerateQuestionsResponse> {
+    return this.request('/api/generate-questions', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': authToken },
+      body: JSON.stringify({
+        topics: request.topics,
+        count: request.count ?? 10,
+        research_mode: request.research_mode ?? false,
+        difficulty: request.difficulty ?? 'mixed',
+      }),
+    })
+  }
+
+  async generateDynamicBatch(
+    request: GenerateDynamicBatchRequest,
+    authToken: string
+  ): Promise<GenerateDynamicBatchResponse> {
+    return this.request('/api/generate-dynamic-batch', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': authToken },
+      body: JSON.stringify(request),
+    })
+  }
+
+  async factCheck(
+    request: FactCheckRequest,
+    authToken: string
+  ): Promise<FactCheckResponse> {
+    return this.request('/api/fact-check', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': authToken },
+      body: JSON.stringify(request),
     })
   }
 

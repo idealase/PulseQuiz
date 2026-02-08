@@ -15,6 +15,24 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Write-Host "`n🎮 PulseQuiz Startup Script" -ForegroundColor Cyan
 Write-Host "==========================`n" -ForegroundColor Cyan
 
+# Load .env file if it exists
+$envFile = Join-Path $ScriptDir ".env"
+if (Test-Path $envFile) {
+    Write-Host "📄 Loading .env file..." -ForegroundColor Gray
+    Get-Content $envFile | ForEach-Object {
+        if ($_ -match '^\s*([^#][^=]+)=(.*)$') {
+            $name = $matches[1].Trim()
+            $value = $matches[2].Trim()
+            # Remove surrounding quotes if present
+            if ($value -match '^["''](.*)["'']$') {
+                $value = $matches[1]
+            }
+            [Environment]::SetEnvironmentVariable($name, $value)
+            Write-Host "   Loaded: $name" -ForegroundColor DarkGray
+        }
+    }
+}
+
 # Refresh PATH for cloudflared
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
@@ -24,18 +42,69 @@ if ($UseNgrok) {
     Write-Host "📡 Mode: Cloudflare Tunnel (corporate-friendly)" -ForegroundColor Green
 }
 
+# --- Environment Diagnostics ---
+Write-Host "`n🔍 Environment Diagnostics" -ForegroundColor Cyan
+Write-Host "─────────────────────────" -ForegroundColor Gray
+
+# Python version
+$pythonVersion = python --version 2>&1
+Write-Host "🐍 Python: $pythonVersion" -ForegroundColor White
+
+# Check for venv
+$venvPath = Join-Path $ScriptDir "backend\venv"
+if (Test-Path $venvPath) {
+    Write-Host "📦 Virtual env: ✅ Found at backend/venv" -ForegroundColor Green
+} else {
+    Write-Host "📦 Virtual env: ⚠️ Not found (using system Python)" -ForegroundColor Yellow
+}
+
+# Check Copilot CLI
+$copilotCli = Get-Command copilot -ErrorAction SilentlyContinue
+if ($copilotCli) {
+    $copilotVersion = copilot --version 2>&1
+    Write-Host "🤖 Copilot CLI: ✅ $copilotVersion" -ForegroundColor Green
+} else {
+    Write-Host "🤖 Copilot CLI: ❌ Not found (AI features disabled)" -ForegroundColor Red
+    Write-Host "   Install: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli" -ForegroundColor Gray
+}
+
+# Check environment variables
+Write-Host "`n🔑 Environment Variables" -ForegroundColor Cyan
+Write-Host "─────────────────────────" -ForegroundColor Gray
+
+if ($env:QUIZ_AUTH_SECRET) {
+    Write-Host "   QUIZ_AUTH_SECRET: ✅ Set (${($env:QUIZ_AUTH_SECRET.Length)} chars)" -ForegroundColor Green
+} else {
+    Write-Host "   QUIZ_AUTH_SECRET: ⚠️ Not set (AI endpoints unprotected!)" -ForegroundColor Yellow
+}
+
+if ($env:GITHUB_TOKEN) {
+    Write-Host "   GITHUB_TOKEN: ✅ Set" -ForegroundColor Green
+} elseif ($env:GH_TOKEN) {
+    Write-Host "   GH_TOKEN: ✅ Set" -ForegroundColor Green
+} else {
+    Write-Host "   GITHUB_TOKEN: ℹ️ Not set (using Copilot CLI auth)" -ForegroundColor Gray
+}
+
 # Check for required tools
+Write-Host "`n🛠️ Required Tools" -ForegroundColor Cyan
+Write-Host "─────────────────────────" -ForegroundColor Gray
+
 if (-not $UseNgrok) {
     if (-not (Get-Command cloudflared -ErrorAction SilentlyContinue)) {
         Write-Host "❌ cloudflared not found. Install with: winget install Cloudflare.cloudflared" -ForegroundColor Red
         Write-Host "   Or use -UseNgrok flag to use ngrok instead" -ForegroundColor Yellow
         exit 1
     }
+    $cfVersion = cloudflared --version 2>&1
+    Write-Host "☁️ Cloudflared: ✅ $cfVersion" -ForegroundColor Green
 } else {
     if (-not (Get-Command ngrok -ErrorAction SilentlyContinue)) {
         Write-Host "❌ ngrok not found. Install with: winget install ngrok.ngrok" -ForegroundColor Red
         exit 1
     }
+    $ngrokVersion = ngrok --version 2>&1
+    Write-Host "🔗 ngrok: ✅ $ngrokVersion" -ForegroundColor Green
 }
 
 if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
@@ -74,13 +143,76 @@ if (-not $UseNgrok) {
     }
 }
 
-# Step 1: Start the backend
-Write-Host "`n🚀 Starting backend server on port $Port..." -ForegroundColor Yellow
+# Step 1: Kill any existing backend on this port, then start fresh
+Write-Host "`n🚀 Starting Backend" -ForegroundColor Cyan
+Write-Host "─────────────────────────" -ForegroundColor Gray
+
+# Kill any existing process on the port
+Write-Host "🔪 Checking for existing processes on port $Port..." -ForegroundColor Gray
+$existingProcess = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
+if ($existingProcess) {
+    foreach ($procId in $existingProcess) {
+        $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+        if ($proc) {
+            Write-Host "   Killing process: $($proc.ProcessName) (PID: $procId)" -ForegroundColor Yellow
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
+        }
+    }
+    Start-Sleep -Seconds 1  # Give it a moment to release the port
+    Write-Host "   ✓ Port $Port cleared" -ForegroundColor Green
+} else {
+    Write-Host "   ✓ Port $Port is free" -ForegroundColor Green
+}
 
 $backendPath = Join-Path $ScriptDir "backend"
+Write-Host "📂 Backend path: $backendPath" -ForegroundColor Gray
+
+# Check Python dependencies
+Write-Host "📋 Checking Python dependencies..." -ForegroundColor Gray
+$reqPath = Join-Path $backendPath "requirements.txt"
+if (Test-Path $reqPath) {
+    $reqs = Get-Content $reqPath | Where-Object { $_ -match "^\w" }
+    Write-Host "   Dependencies in requirements.txt:" -ForegroundColor Gray
+    foreach ($req in $reqs) {
+        Write-Host "   - $req" -ForegroundColor DarkGray
+    }
+}
+
+# Check if github-copilot-sdk is installed (package name is 'github-copilot-sdk' but imports as 'copilot')
+Write-Host "📦 Checking Copilot SDK installation..." -ForegroundColor Gray
+try {
+    $venvPython = Join-Path $backendPath "venv\Scripts\python.exe"
+    if (Test-Path $venvPython) {
+        $sdkCheck = & $venvPython -c "import copilot; print(f'v{copilot.__version__}')" 2>&1
+    } else {
+        $sdkCheck = python -c "import copilot; print(f'v{copilot.__version__}')" 2>&1
+    }
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ✅ Copilot SDK (github-copilot-sdk): $sdkCheck" -ForegroundColor Green
+    } else {
+        Write-Host "   ⚠️ Copilot SDK: Not installed" -ForegroundColor Yellow
+        Write-Host "   Run: pip install github-copilot-sdk" -ForegroundColor Gray
+        Write-Host "   Error: $sdkCheck" -ForegroundColor DarkGray
+    }
+} catch {
+    Write-Host "   ⚠️ Could not check Copilot SDK: $_" -ForegroundColor Yellow
+}
+
+Write-Host "`n⚡ Starting uvicorn on port $Port..." -ForegroundColor Yellow
+
+# Capture env vars to pass to job
+$authSecret = $env:QUIZ_AUTH_SECRET
+$githubToken = $env:GITHUB_TOKEN
+$ghToken = $env:GH_TOKEN
+
 $backendJob = Start-Job -ScriptBlock {
-    param($path, $port)
+    param($path, $port, $authSecret, $githubToken, $ghToken)
     Set-Location $path
+    
+    # Set environment variables in the job
+    if ($authSecret) { $env:QUIZ_AUTH_SECRET = $authSecret }
+    if ($githubToken) { $env:GITHUB_TOKEN = $githubToken }
+    if ($ghToken) { $env:GH_TOKEN = $ghToken }
     
     # Activate venv if it exists
     $venvActivate = Join-Path $path "venv\Scripts\Activate.ps1"
@@ -89,17 +221,26 @@ $backendJob = Start-Job -ScriptBlock {
     }
     
     python -m uvicorn main:app --host 0.0.0.0 --port $port
-} -ArgumentList $backendPath, $Port
+} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken
 
 # Wait for backend to start
+Write-Host "⏳ Waiting for backend to initialize..." -ForegroundColor Gray
 Start-Sleep -Seconds 3
 
 # Check if backend is running
 try {
     $response = Invoke-WebRequest -Uri "http://localhost:$Port/health" -TimeoutSec 5 -ErrorAction SilentlyContinue
-    Write-Host "✅ Backend is running" -ForegroundColor Green
+    Write-Host "✅ Backend health check passed" -ForegroundColor Green
+    
+    # Try to hit the root to verify full startup
+    try {
+        $rootResponse = Invoke-WebRequest -Uri "http://localhost:$Port/" -TimeoutSec 3 -ErrorAction SilentlyContinue
+        $rootJson = $rootResponse.Content | ConvertFrom-Json
+        Write-Host "   API Version: $($rootJson.version)" -ForegroundColor Gray
+    } catch {}
 } catch {
-    Write-Host "⚠️  Backend may still be starting..." -ForegroundColor Yellow
+    Write-Host "⚠️  Backend may still be starting... (health check failed)" -ForegroundColor Yellow
+    Write-Host "   Check backend logs for errors" -ForegroundColor Gray
 }
 
 # ============================================

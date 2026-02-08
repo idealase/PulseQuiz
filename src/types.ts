@@ -16,6 +16,8 @@ export interface Player {
 export interface GameSettings {
   timerMode: boolean
   timerSeconds: number
+  autoProgressMode: boolean
+  autoProgressPercent: number
 }
 
 export interface SessionState {

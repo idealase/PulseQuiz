@@ -36,6 +36,13 @@ export default function Landing() {
         >
           👀 Watch Game
         </Link>
+        
+        <Link
+          to="/solo"
+          className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/50 hover:from-yellow-500/30 hover:to-orange-500/30 hover:border-yellow-500 text-yellow-300 transition-all duration-300 hover:scale-105 active:scale-95"
+        >
+          🎯 Solo Mode
+        </Link>
       </div>
 
       <div className="mt-12 text-white/40 text-sm text-center">

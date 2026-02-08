@@ -2,18 +2,47 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Head
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, List
 from pathlib import Path
 import json
 import asyncio
 import time
+import os
+import re
+import logging
+import traceback
+import sys
+import subprocess
+import shutil
 
 from models import (
     Session, Question, Player, GameSettings,
     LiveLeaderboardEntry, QuestionStats, AnswerStatus,
     generate_session_code, generate_token, generate_player_id
 )
+
+# Configure logging for verbose output
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s | %(levelname)s | %(message)s',
+    datefmt='%H:%M:%S'
+)
+logger = logging.getLogger("PulseQuiz")
+
+# Copilot SDK imports (optional - gracefully handle if not installed)
+COPILOT_SDK_AVAILABLE = False
+COPILOT_MODULE_INFO = ""
+try:
+    from copilot import CopilotClient, define_tool
+    import copilot
+    COPILOT_SDK_AVAILABLE = True
+    COPILOT_MODULE_INFO = f"version={getattr(copilot, '__version__', 'unknown')}, path={copilot.__file__}"
+    logger.info(f"🤖 Copilot SDK loaded successfully: {COPILOT_MODULE_INFO}")
+except ImportError as e:
+    COPILOT_SDK_AVAILABLE = False
+    COPILOT_MODULE_INFO = f"Import failed: {e}"
+    logger.warning(f"⚠️  Copilot SDK not installed - AI features disabled. Error: {e}")
 
 app = FastAPI(title="PulseQuiz API")
 
@@ -62,6 +91,8 @@ def add_session_event(code: str, event: dict):
 class CreateSessionRequest(BaseModel):
     timerMode: bool = False
     timerSeconds: int = 15
+    autoProgressMode: bool = False
+    autoProgressPercent: int = 90
 
 
 class CreateSessionResponse(BaseModel):
@@ -89,6 +120,265 @@ class AnswerRequest(BaseModel):
 
 class ObserveResponse(BaseModel):
     observerId: str
+
+
+# --- AI Generation Request/Response Models ---
+
+class GenerateQuestionsRequest(BaseModel):
+    topics: str = Field(description="Comma-separated list of topics")
+    count: int = Field(default=10, ge=3, le=30, description="Number of questions to generate")
+    research_mode: bool = Field(default=False, description="Enable deeper research (uses more AI)")
+    difficulty: str = Field(default="mixed", description="easy, medium, hard, or mixed")
+
+
+class GenerateQuestionsResponse(BaseModel):
+    questions: List[Question]
+    topics_clarified: Optional[str] = None
+    generation_time_ms: int
+
+
+class PerformanceData(BaseModel):
+    avg_score_percent: float = Field(description="Average score as percentage 0-100")
+    avg_response_time_ms: int = Field(description="Average response time in milliseconds")
+    player_count: int = Field(description="Number of active players")
+    questions_answered: int = Field(description="Total questions answered this batch")
+
+
+class GenerateDynamicBatchRequest(BaseModel):
+    topics: str
+    session_code: str
+    batch_number: int
+    performance: Optional[PerformanceData] = None
+    previous_difficulty: str = "medium"
+    batch_size: int = Field(default=5, ge=3, le=10)
+
+
+class GenerateDynamicBatchResponse(BaseModel):
+    questions: List[Question]
+    suggested_difficulty: str
+    difficulty_reason: str
+    batch_number: int
+
+
+class FactCheckRequest(BaseModel):
+    question: str
+    claimed_answer: str
+    all_options: List[str]
+
+
+class FactCheckResponse(BaseModel):
+    verified: bool
+    confidence: float
+    explanation: str
+    source_hint: Optional[str] = None
+
+
+# --- AI Generation Helper Functions ---
+
+# Auth secret for AI endpoints (simple shared secret)
+QUIZ_AUTH_SECRET = os.environ.get("QUIZ_AUTH_SECRET", "")
+
+def verify_auth_token(token: str) -> bool:
+    """Verify the auth token for AI endpoints"""
+    if not QUIZ_AUTH_SECRET:
+        logger.warning("⚠️  QUIZ_AUTH_SECRET not set - AI endpoints unprotected!")
+        return True  # Allow if not configured (dev mode)
+    return token == QUIZ_AUTH_SECRET
+
+
+QUIZ_SYSTEM_PROMPT = """You are a quiz question generator for a live trivia game. Generate engaging, accurate multiple-choice questions.
+
+RULES:
+1. Each question must have exactly 4 options (A, B, C, D)
+2. Exactly one option must be correct
+3. Include one obviously humorous/wrong option for fun
+4. Mix difficulty levels unless specified
+5. Questions should be educational and engaging
+6. Avoid controversial, political, or sensitive topics
+
+OUTPUT FORMAT - Return ONLY valid JSON (no markdown, no explanation):
+{
+  "questions": [
+    {
+      "question": "The question text?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0,
+      "points": 1
+    }
+  ]
+}
+
+The "correct" field is the 0-based index of the correct answer (0=A, 1=B, 2=C, 3=D)."""
+
+
+def parse_questions_from_response(content: str) -> List[Question]:
+    """Parse questions JSON from Copilot response, handling various formats"""
+    logger.info(f"📝 Parsing response ({len(content)} chars)")
+    
+    # Try to extract JSON from the response
+    # Sometimes models wrap it in ```json ... ```
+    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+    if json_match:
+        content = json_match.group(1).strip()
+    
+    # Try to find JSON object
+    json_start = content.find('{')
+    json_end = content.rfind('}') + 1
+    if json_start != -1 and json_end > json_start:
+        content = content[json_start:json_end]
+    
+    try:
+        data = json.loads(content)
+        questions_data = data.get('questions', [])
+        
+        questions = []
+        for i, q in enumerate(questions_data):
+            try:
+                question = Question(
+                    question=q['question'],
+                    options=q['options'][:4],  # Ensure max 4 options
+                    correct=min(q['correct'], 3),  # Ensure valid index
+                    points=q.get('points', 1),
+                    explanation=q.get('explanation')
+                )
+                questions.append(question)
+            except (KeyError, TypeError) as e:
+                logger.warning(f"⚠️  Skipping invalid question {i}: {e}")
+                continue
+        
+        logger.info(f"✅ Parsed {len(questions)} valid questions")
+        return questions
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"❌ JSON parse error: {e}")
+        logger.error(f"   Content preview: {content[:200]}...")
+        raise ValueError(f"Failed to parse questions JSON: {e}")
+
+
+def find_copilot_cli() -> Optional[str]:
+    """Find the Copilot CLI executable"""
+    # Check env var first
+    cli_path = os.environ.get("COPILOT_CLI_PATH")
+    if cli_path and os.path.exists(cli_path):
+        return cli_path
+    
+    # Known Windows locations - prefer the actual exe
+    possible_paths = [
+        r"C:\Users\brodi\AppData\Local\Microsoft\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\copilot.exe",
+        r"C:\Users\brodi\AppData\Local\Microsoft\WinGet\Links\copilot.exe",
+        os.path.expanduser("~\\AppData\\Local\\Microsoft\\WinGet\\Links\\copilot.exe"),
+        os.path.expanduser("~\\AppData\\Local\\Microsoft\\WinGet\\Packages\\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\\copilot.exe"),
+        os.path.expanduser("~\\AppData\\Roaming\\npm\\copilot.cmd"),
+    ]
+    for p in possible_paths:
+        if os.path.exists(p):
+            return p
+    
+    # Fall back to which/where
+    cli_path = shutil.which("copilot")
+    if cli_path:
+        return cli_path
+    
+    return None
+
+
+async def generate_with_copilot(
+    prompt: str,
+    system_message: str = QUIZ_SYSTEM_PROMPT,
+    model: str = "gpt-4.1"
+) -> str:
+    """Generate content using Copilot CLI directly (non-interactive mode)"""
+    logger.info("=" * 60)
+    logger.info("🤖 [Copilot CLI] STARTING AI GENERATION")
+    logger.info("=" * 60)
+    
+    cli_path = find_copilot_cli()
+    if not cli_path:
+        logger.error("❌ Copilot CLI not found!")
+        raise HTTPException(
+            status_code=503, 
+            detail="Copilot CLI not found. Install with: winget install GitHub.Copilot"
+        )
+    
+    logger.info(f"🔧 CLI Path: {cli_path}")
+    logger.info(f"🎯 Model requested: {model}")
+    logger.info(f"📝 System message: {system_message[:100]}...")
+    logger.info(f"📝 Prompt ({len(prompt)} chars): {prompt[:200]}...")
+    
+    # Build the full prompt with system message
+    full_prompt = f"""{system_message}
+
+USER REQUEST:
+{prompt}"""
+    
+    start_time = time.time()
+    
+    try:
+        # Run copilot CLI in non-interactive mode
+        # -p = prompt, -s = silent (only output response), --allow-all-tools = no permission prompts
+        cmd = [
+            cli_path,
+            "-p", full_prompt,
+            "-s",  # Silent mode - only output response
+            "--allow-all-tools",  # Don't prompt for permissions
+            "--model", model,
+        ]
+        
+        logger.info(f"📡 Running command: {cmd[0]} -p '...' -s --allow-all-tools --model {model}")
+        
+        # Run the process
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=os.getcwd()
+        )
+        
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=120  # 2 minute timeout
+        )
+        
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        
+        stdout_text = stdout.decode('utf-8', errors='replace').strip()
+        stderr_text = stderr.decode('utf-8', errors='replace').strip()
+        
+        logger.info(f"   ✓ Process completed in {elapsed_ms}ms with exit code {process.returncode}")
+        logger.info(f"   stdout length: {len(stdout_text)} chars")
+        if stderr_text:
+            logger.warning(f"   stderr: {stderr_text[:500]}...")
+        
+        if process.returncode != 0:
+            logger.error(f"❌ CLI returned non-zero exit code: {process.returncode}")
+            logger.error(f"   stderr: {stderr_text}")
+            raise RuntimeError(f"Copilot CLI failed with exit code {process.returncode}: {stderr_text[:200]}")
+        
+        if stdout_text:
+            logger.info(f"   Content preview: {stdout_text[:500]}...")
+        else:
+            logger.warning("   ⚠️  EMPTY RESPONSE!")
+        
+        logger.info("=" * 60)
+        logger.info(f"✅ [Copilot CLI] GENERATION COMPLETE ({elapsed_ms}ms)")
+        logger.info("=" * 60)
+        
+        return stdout_text
+        
+    except asyncio.TimeoutError:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        logger.error(f"❌ Copilot CLI timed out after {elapsed_ms}ms")
+        raise RuntimeError("Copilot CLI timed out after 120 seconds")
+        
+    except Exception as e:
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        logger.error("=" * 60)
+        logger.error(f"❌ [Copilot CLI] GENERATION FAILED after {elapsed_ms}ms")
+        logger.error("=" * 60)
+        logger.error(f"Exception type: {type(e).__name__}")
+        logger.error(f"Exception message: {str(e)}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        raise
 
 
 # --- Timer Logic ---
@@ -161,6 +451,36 @@ def cancel_timer(code: str):
         del timer_tasks[code]
 
 
+async def auto_advance_question(code: str, session):
+    """Auto-advance to next question or reveal (used by auto-progress mode)"""
+    # Cancel any running timer since we're advancing early
+    cancel_timer(code)
+    
+    if session.current_question_index >= len(session.questions) - 1:
+        # Last question - reveal results
+        session.status = 'revealed'
+        session.calculate_scores()
+        results = session.get_reveal_results()
+        await broadcast_to_session(code, {
+            'type': 'revealed',
+            'results': results.model_dump()
+        })
+    else:
+        # Move to next question
+        session.current_question_index += 1
+        session.question_start_times[session.current_question_index] = time.time()
+        
+        await broadcast_to_session(code, {
+            'type': 'question_started',
+            'questionIndex': session.current_question_index
+        })
+        
+        # Start new timer if timer mode is also enabled
+        if session.timer_mode:
+            task = asyncio.create_task(run_question_timer(code, session.current_question_index))
+            timer_tasks[code] = task
+
+
 # --- Helper Functions ---
 
 async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None, host_only: bool = False, exclude_observers: bool = False):
@@ -224,7 +544,9 @@ async def create_session(request: CreateSessionRequest = CreateSessionRequest())
         code=code, 
         host_token=host_token,
         timer_mode=request.timerMode,
-        timer_seconds=max(5, min(120, request.timerSeconds))  # Clamp between 5-120 seconds
+        timer_seconds=max(5, min(120, request.timerSeconds)),  # Clamp between 5-120 seconds
+        auto_progress_mode=request.autoProgressMode,
+        auto_progress_percent=max(50, min(100, request.autoProgressPercent))  # Clamp between 50-100%
     )
     ws_connections[code] = {}
     
@@ -510,6 +832,17 @@ async def submit_answer(code: str, request: AnswerRequest):
         'stats': stats.model_dump()
     }, exclude_observers=False)
     
+    # Check auto-progress mode: if enough players have answered, auto-advance
+    if session.auto_progress_mode and len(session.players) > 0:
+        answered_count = len(answer_status.answered)
+        total_players = len(session.players)
+        answer_percent = (answered_count / total_players) * 100
+        
+        if answer_percent >= session.auto_progress_percent:
+            logger.info(f"🚀 Auto-progress triggered: {answer_percent:.0f}% answered (threshold: {session.auto_progress_percent}%)")
+            # Auto-advance to next question or reveal
+            await auto_advance_question(code, session)
+    
     return {"ok": True}
 
 
@@ -731,6 +1064,282 @@ async def get_session_events(
     }
 
 
+# --- AI Generation Endpoints ---
+
+@app.get("/api/ai-status")
+async def get_ai_status():
+    """Get the status of AI/Copilot SDK - useful for debugging"""
+    gh_token = os.environ.get("GITHUB_TOKEN", "")
+    gh_copilot_token = os.environ.get("GH_COPILOT_TOKEN", "")
+    
+    status = {
+        "sdk_available": COPILOT_SDK_AVAILABLE,
+        "sdk_info": COPILOT_MODULE_INFO,
+        "github_token_set": bool(gh_token),
+        "github_token_length": len(gh_token) if gh_token else 0,
+        "gh_copilot_token_set": bool(gh_copilot_token),
+        "gh_copilot_token_length": len(gh_copilot_token) if gh_copilot_token else 0,
+        "python_version": sys.version,
+        "auth_secret_set": bool(os.environ.get("QUIZ_AUTH_SECRET", "")),
+    }
+    
+    # Try to import and inspect the copilot module more
+    if COPILOT_SDK_AVAILABLE:
+        try:
+            import copilot
+            status["copilot_dir"] = [x for x in dir(copilot) if not x.startswith('_')]
+        except Exception as e:
+            status["copilot_inspect_error"] = str(e)
+    
+    logger.info(f"📊 AI Status check: {status}")
+    return status
+
+
+@app.get("/api/ai-test")
+async def test_ai_connection():
+    """Test the Copilot CLI - run a simple prompt and verify it works"""
+    cli_path = find_copilot_cli()
+    
+    result = {
+        "cli_found": bool(cli_path),
+        "cli_path": cli_path,
+        "cli_version": None,
+        "test_response": None,
+        "errors": []
+    }
+    
+    if not cli_path:
+        result["errors"].append("Copilot CLI not found")
+        return result
+    
+    try:
+        # Get version
+        logger.info(f"🧪 [AI Test] Checking CLI version...")
+        version_proc = await asyncio.create_subprocess_exec(
+            cli_path, "--version",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(version_proc.communicate(), timeout=10)
+        result["cli_version"] = stdout.decode().strip()
+        logger.info(f"   ✓ Version: {result['cli_version']}")
+        
+        # Test a simple prompt
+        logger.info(f"🧪 [AI Test] Testing simple prompt...")
+        test_proc = await asyncio.create_subprocess_exec(
+            cli_path,
+            "-p", "Say 'Hello from Copilot!' and nothing else.",
+            "-s",
+            "--allow-all-tools",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        stdout, stderr = await asyncio.wait_for(test_proc.communicate(), timeout=60)
+        
+        if test_proc.returncode == 0:
+            result["test_response"] = stdout.decode().strip()
+            logger.info(f"   ✓ Test response: {result['test_response'][:100]}...")
+        else:
+            result["errors"].append(f"CLI failed with exit code {test_proc.returncode}: {stderr.decode()}")
+            logger.error(f"   ✗ CLI failed: {stderr.decode()}")
+            
+    except asyncio.TimeoutError:
+        result["errors"].append("CLI timed out")
+        logger.error("   ✗ CLI timed out")
+    except Exception as e:
+        result["errors"].append(f"{type(e).__name__}: {e}")
+        logger.error(f"   ✗ Error: {e}")
+    
+    return result
+
+
+@app.post("/api/generate-questions", response_model=GenerateQuestionsResponse)
+async def generate_questions(
+    request: GenerateQuestionsRequest,
+    x_auth_token: str = Header(default="")
+):
+    """Generate quiz questions using Copilot SDK"""
+    if not verify_auth_token(x_auth_token):
+        raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
+    
+    logger.info(f"🎯 Generate request: topics='{request.topics}', count={request.count}, research={request.research_mode}")
+    start_time = time.time()
+    
+    # Build the prompt
+    difficulty_instruction = ""
+    if request.difficulty != "mixed":
+        difficulty_instruction = f"\nDifficulty level: {request.difficulty.upper()} - adjust question complexity accordingly."
+    
+    research_instruction = ""
+    if request.research_mode:
+        research_instruction = "\nPlease research these topics thoroughly before generating questions. Include interesting and lesser-known facts."
+    
+    prompt = f"""Generate {request.count} multiple-choice quiz questions about the following topics: {request.topics}
+{difficulty_instruction}{research_instruction}
+
+Remember to output ONLY valid JSON with the questions array."""
+
+    try:
+        content = await generate_with_copilot(prompt)
+        questions = parse_questions_from_response(content)
+        
+        if len(questions) < request.count // 2:
+            logger.warning(f"⚠️  Only got {len(questions)} questions, expected ~{request.count}")
+        
+        elapsed_ms = int((time.time() - start_time) * 1000)
+        logger.info(f"✅ Generated {len(questions)} questions in {elapsed_ms}ms")
+        
+        return GenerateQuestionsResponse(
+            questions=questions,
+            generation_time_ms=elapsed_ms
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Question generation failed: {str(e)}")
+
+
+@app.post("/api/generate-dynamic-batch", response_model=GenerateDynamicBatchResponse)
+async def generate_dynamic_batch(
+    request: GenerateDynamicBatchRequest,
+    x_auth_token: str = Header(default="")
+):
+    """Generate a batch of questions with difficulty calibrated to player performance"""
+    if not verify_auth_token(x_auth_token):
+        raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
+    
+    logger.info(f"🎲 Dynamic batch request: batch #{request.batch_number}, previous_difficulty={request.previous_difficulty}")
+    
+    # Calculate suggested difficulty based on performance
+    suggested_difficulty = request.previous_difficulty
+    difficulty_reason = "Initial batch - starting at medium difficulty"
+    
+    if request.performance:
+        perf = request.performance
+        logger.info(f"📊 Performance data: {perf.avg_score_percent:.1f}% correct, {perf.avg_response_time_ms}ms avg response")
+        
+        # Difficulty calibration logic
+        if perf.avg_score_percent > 80 and perf.avg_response_time_ms < 5000:
+            # Too easy - players are crushing it
+            if request.previous_difficulty == "easy":
+                suggested_difficulty = "medium"
+            elif request.previous_difficulty == "medium":
+                suggested_difficulty = "hard"
+            else:
+                suggested_difficulty = "hard"
+            difficulty_reason = f"Players scoring {perf.avg_score_percent:.0f}% in {perf.avg_response_time_ms/1000:.1f}s - increasing difficulty"
+            
+        elif perf.avg_score_percent < 40 and perf.avg_response_time_ms > 10000:
+            # Too hard - players struggling
+            if request.previous_difficulty == "hard":
+                suggested_difficulty = "medium"
+            elif request.previous_difficulty == "medium":
+                suggested_difficulty = "easy"
+            else:
+                suggested_difficulty = "easy"
+            difficulty_reason = f"Players scoring {perf.avg_score_percent:.0f}% in {perf.avg_response_time_ms/1000:.1f}s - decreasing difficulty"
+            
+        elif perf.avg_score_percent < 60:
+            # Slightly too hard
+            if request.previous_difficulty == "hard":
+                suggested_difficulty = "medium"
+            difficulty_reason = f"Players at {perf.avg_score_percent:.0f}% - maintaining/slight decrease"
+        else:
+            difficulty_reason = f"Players at {perf.avg_score_percent:.0f}% - good balance, maintaining {suggested_difficulty}"
+    
+    logger.info(f"📈 Difficulty decision: {suggested_difficulty} - {difficulty_reason}")
+    
+    # Build prompt with performance context
+    performance_context = ""
+    if request.performance:
+        performance_context = f"""
+Player Performance Context (use this to calibrate question difficulty):
+- Average score: {request.performance.avg_score_percent:.1f}%
+- Average response time: {request.performance.avg_response_time_ms}ms
+- Players: {request.performance.player_count}
+- Target difficulty: {suggested_difficulty.upper()}
+"""
+
+    prompt = f"""Generate {request.batch_size} multiple-choice quiz questions about: {request.topics}
+
+This is batch #{request.batch_number} in a dynamic quiz session.
+{performance_context}
+Difficulty level: {suggested_difficulty.upper()}
+
+Make the questions {'more challenging' if suggested_difficulty == 'hard' else 'more accessible' if suggested_difficulty == 'easy' else 'moderately challenging'}.
+
+Output ONLY valid JSON with the questions array."""
+
+    try:
+        content = await generate_with_copilot(prompt)
+        questions = parse_questions_from_response(content)
+        
+        logger.info(f"✅ Dynamic batch #{request.batch_number}: {len(questions)} questions at {suggested_difficulty} difficulty")
+        
+        return GenerateDynamicBatchResponse(
+            questions=questions,
+            suggested_difficulty=suggested_difficulty,
+            difficulty_reason=difficulty_reason,
+            batch_number=request.batch_number
+        )
+        
+    except Exception as e:
+        logger.error(f"❌ Dynamic batch generation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Batch generation failed: {str(e)}")
+
+
+@app.post("/api/fact-check", response_model=FactCheckResponse)
+async def fact_check_answer(
+    request: FactCheckRequest,
+    x_auth_token: str = Header(default="")
+):
+    """Fact-check a quiz question and answer"""
+    if not verify_auth_token(x_auth_token):
+        raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
+    
+    logger.info(f"🔍 Fact-check request: '{request.question[:50]}...'")
+    
+    prompt = f"""Please fact-check the following quiz question and answer:
+
+Question: {request.question}
+Claimed correct answer: {request.claimed_answer}
+All options were: {', '.join(request.all_options)}
+
+Verify if the claimed answer is correct. Respond with ONLY valid JSON:
+{{
+  "verified": true/false,
+  "confidence": 0.0-1.0,
+  "explanation": "Brief explanation of why this is correct/incorrect",
+  "source_hint": "Where one might verify this (optional)"
+}}"""
+
+    try:
+        content = await generate_with_copilot(
+            prompt,
+            system_message="You are a fact-checker. Verify trivia answers accurately and concisely. Output ONLY valid JSON."
+        )
+        
+        # Parse the response
+        json_match = re.search(r'\{[\s\S]*\}', content)
+        if json_match:
+            data = json.loads(json_match.group())
+            
+            logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={data.get('confidence')}")
+            
+            return FactCheckResponse(
+                verified=data.get('verified', False),
+                confidence=float(data.get('confidence', 0.5)),
+                explanation=data.get('explanation', 'Unable to verify'),
+                source_hint=data.get('source_hint')
+            )
+        else:
+            raise ValueError("No JSON found in response")
+            
+    except Exception as e:
+        logger.error(f"❌ Fact-check failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Fact-check failed: {str(e)}")
+
+
 # --- Static File Serving (for self-hosted deployment) ---
 
 # Path to frontend build (../dist from backend folder)
@@ -741,20 +1350,32 @@ if FRONTEND_DIR.exists():
     # Mount static assets (js, css, etc)
     app.mount("/assets", StaticFiles(directory=FRONTEND_DIR / "assets"), name="assets")
     
-    # Serve index.html for all non-API routes (SPA support)
-    @app.get("/{full_path:path}")
-    async def serve_spa(full_path: str):
-        # Don't intercept API or WebSocket routes
-        if full_path.startswith("api/") or full_path.startswith("ws/"):
-            raise HTTPException(status_code=404)
-        
+    # Serve other static files (favicon, etc)
+    @app.get("/favicon.svg")
+    async def favicon():
+        return FileResponse(FRONTEND_DIR / "favicon.svg")
+    
+    @app.get("/config.json")
+    async def config_json():
+        return FileResponse(FRONTEND_DIR / "config.json")
+
+
+# Catch-all route MUST be defined last, after all API routes
+# This serves the SPA for client-side routing
+@app.api_route("/{full_path:path}", methods=["GET"], include_in_schema=False)
+async def serve_spa(full_path: str):
+    """Serve SPA for non-API GET requests"""
+    # Only serve index.html for GET requests to non-API paths
+    if FRONTEND_DIR.exists():
         # Try to serve the exact file first
         file_path = FRONTEND_DIR / full_path
-        if file_path.is_file():
+        if file_path.is_file() and not full_path.startswith("api/"):
             return FileResponse(file_path)
         
-        # Otherwise serve index.html (SPA routing)
+        # Serve index.html for SPA routing
         return FileResponse(FRONTEND_DIR / "index.html")
+    
+    raise HTTPException(status_code=404, detail="Not found")
 
 
 if __name__ == "__main__":

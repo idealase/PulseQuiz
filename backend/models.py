@@ -24,6 +24,8 @@ class Player(BaseModel):
 class GameSettings(BaseModel):
     timerMode: bool = False
     timerSeconds: int = 15
+    autoProgressMode: bool = False
+    autoProgressPercent: int = 90  # Progress when X% have answered
 
 
 class SessionState(BaseModel):
@@ -96,6 +98,8 @@ class Session:
     timer_seconds: int = 15
     timer_remaining: Optional[int] = None
     timer_task: Optional[object] = None  # asyncio Task reference
+    auto_progress_mode: bool = False
+    auto_progress_percent: int = 90
     
     def to_state(self, include_answers: bool = False) -> SessionState:
         """Convert to client-facing state (without correct answers during play)"""
@@ -123,7 +127,12 @@ class Session:
             players=players_list,
             questions=questions_for_client,
             roundSize=self.round_size,
-            settings=GameSettings(timerMode=self.timer_mode, timerSeconds=self.timer_seconds),
+            settings=GameSettings(
+                timerMode=self.timer_mode, 
+                timerSeconds=self.timer_seconds,
+                autoProgressMode=self.auto_progress_mode,
+                autoProgressPercent=self.auto_progress_percent
+            ),
             timerRemaining=self.timer_remaining
         )
     
