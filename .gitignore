@@ -4,6 +4,9 @@ dist/
 .env.local
 *.log
 
+# Backend logs
+backend/logs/
+
 # Python
 __pycache__/
 *.py[cod]
