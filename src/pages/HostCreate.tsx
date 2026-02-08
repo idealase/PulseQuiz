@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
@@ -178,6 +178,10 @@ export default function HostCreate() {
 
   return (
     <div className="min-h-screen p-6 max-w-lg mx-auto">
+      <Link to="/" className="text-white/60 hover:text-white mb-4 inline-block">
+        ← Back
+      </Link>
+
       <h1 className="text-3xl font-bold mb-8 text-center">Host a Quiz</h1>
 
       {!sessionCode ? (

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
@@ -133,7 +133,7 @@ export default function AudienceSession() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <span className="text-white/60 text-sm">Watching</span>
+          <Link to="/" className="text-white/60 hover:text-white text-sm">← Home</Link>
           <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
         </div>
         <div className="flex items-center gap-4">

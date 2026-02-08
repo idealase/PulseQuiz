@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, QuestionResult } from '../types'
@@ -162,7 +162,7 @@ export default function PlayerSession() {
   ]
 
   return (
-    <div className="min-h-screen p-4 max-w-lg mx-auto flex flex-col">
+    <div className="h-[100dvh] p-4 max-w-lg mx-auto flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -225,23 +225,23 @@ export default function PlayerSession() {
 
       {/* Playing State */}
       {session.status === 'playing' && currentQuestion && (
-        <div className="flex-1 flex flex-col animate-slide-up">
+        <div className="flex-1 flex flex-col min-h-0 animate-slide-up">
           {/* Timer expired warning */}
           {session.settings?.timerMode && timerRemaining === 0 && !answerLocked && (
-            <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300 text-center animate-pulse">
-              ⏰ Time's up! Waiting for next question...
+            <div className="mb-2 p-2 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300 text-center animate-pulse text-sm">
+              ⏰ Time's up!
             </div>
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-2xl p-5 mb-4">
-            <h2 className="text-lg md:text-xl font-bold text-center">
+          <div className="bg-white/10 rounded-2xl p-3 mb-2 shrink-0">
+            <h2 className="text-base md:text-xl font-bold text-center">
               {currentQuestion.question}
             </h2>
           </div>
 
           {/* Options */}
-          <div className="flex-1 grid grid-cols-1 gap-3">
+          <div className="flex-1 grid grid-cols-1 gap-2 min-h-0 auto-rows-fr">
             {currentQuestion.options.map((opt, i) => {
               const timerExpired = session.settings?.timerMode && timerRemaining === 0
               const isDisabled = answerLocked || timerExpired
@@ -251,7 +251,7 @@ export default function PlayerSession() {
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`p-4 rounded-xl text-left font-medium transition-all active:scale-98 ${
+                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
                         ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
@@ -261,8 +261,8 @@ export default function PlayerSession() {
                         : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
                   }`}
                 >
-                  <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                  {opt}
+                  <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
+                  <span className="line-clamp-2">{opt}</span>
                 </button>
               )
             })}
@@ -273,16 +273,16 @@ export default function PlayerSession() {
             <button
               onClick={handleConfirmAnswer}
               disabled={selectedAnswer === null}
-              className="mt-4 py-4 text-lg font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="mt-2 py-3 text-lg font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
             >
               Lock In Answer
             </button>
           ) : answerLocked ? (
-            <div className="mt-4 py-4 text-lg font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500">
+            <div className="mt-2 py-3 text-lg font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500 shrink-0">
               ✓ Answer Locked
             </div>
           ) : (
-            <div className="mt-4 py-4 text-lg font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300">
+            <div className="mt-2 py-3 text-lg font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300 shrink-0">
               ⏰ Time Expired
             </div>
           )}
@@ -291,7 +291,7 @@ export default function PlayerSession() {
 
       {/* Revealed State */}
       {session.status === 'revealed' && results && (
-        <div className="flex-1 animate-slide-up overflow-y-auto">
+        <div className="flex-1 animate-slide-up overflow-y-auto min-h-0">
           {/* My Score */}
           {myScore && (
             <div className="bg-gradient-to-r from-primary to-secondary rounded-2xl p-6 text-center mb-6">
@@ -338,6 +338,22 @@ export default function PlayerSession() {
           <p className="text-center text-white/40 text-xs mb-4">
             Ties broken by fastest total answer time ⚡
           </p>
+
+          {/* Post-Game Actions */}
+          <div className="flex gap-3 mb-6">
+            <Link
+              to="/join"
+              className="flex-1 py-3 text-center font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all"
+            >
+              🎮 Join New Game
+            </Link>
+            <Link
+              to="/"
+              className="flex-1 py-3 text-center font-bold rounded-2xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
+            >
+              🏠 Home
+            </Link>
+          </div>
 
           {/* Question Review */}
           <div className="space-y-3">

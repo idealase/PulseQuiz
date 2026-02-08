@@ -21,14 +21,15 @@ from models import (
     LiveLeaderboardEntry, QuestionStats, AnswerStatus,
     generate_session_code, generate_token, generate_player_id
 )
-
-# Configure logging for verbose output
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s | %(levelname)s | %(message)s',
-    datefmt='%H:%M:%S'
+from logger import (
+    setup_logging, get_logger, get_copilot_logger,
+    CopilotCallTracker, summarize_token_usage,
 )
-logger = logging.getLogger("PulseQuiz")
+
+# Initialise structured, file-based logging
+setup_logging(console_level=logging.INFO)
+logger = get_logger("PulseQuiz")
+copilot_log = get_copilot_logger()
 
 # Copilot SDK imports (optional - gracefully handle if not installed)
 COPILOT_SDK_AVAILABLE = False
@@ -308,12 +309,10 @@ def find_copilot_cli() -> Optional[str]:
 async def generate_with_copilot(
     prompt: str,
     system_message: str = QUIZ_SYSTEM_PROMPT,
-    model: str = "gpt-4.1"
+    model: str = "gpt-4.1",
+    caller: str = "generate_with_copilot",
 ) -> str:
     """Generate content using Copilot CLI directly (non-interactive mode)"""
-    logger.info("=" * 60)
-    logger.info("🤖 [Copilot CLI] STARTING AI GENERATION")
-    logger.info("=" * 60)
     
     # Validate model name (basic sanity check)
     valid_models = [
@@ -322,103 +321,124 @@ async def generate_with_copilot(
         "gpt-5.1-codex", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1"
     ]
     if model not in valid_models:
-        logger.warning(f"⚠️  Unrecognized model: {model}, using default gpt-4.1")
+        copilot_log.warning("Unrecognized model: %s, using default gpt-4.1", model)
         model = "gpt-4.1"
-    
-    cli_path = find_copilot_cli()
-    if not cli_path:
-        logger.error("❌ Copilot CLI not found!")
-        raise HTTPException(
-            status_code=503, 
-            detail="Copilot CLI not found. Install github-copilot-sdk: pip install github-copilot-sdk"
-        )
-    
-    logger.info(f"🔧 CLI Path: {cli_path}")
-    logger.info(f"🎯 Model: {model}")
-    logger.info(f"📝 System message: {system_message[:100]}...")
-    logger.info(f"📝 Prompt ({len(prompt)} chars): {prompt[:200]}...")
-    
+
     # Build the full prompt with system message
     full_prompt = f"""{system_message}
 
 USER REQUEST:
 {prompt}"""
-    
-    start_time = time.time()
-    
+
+    # ---- Set up call tracker for token / usage logging ------------------
+    tracker = CopilotCallTracker(
+        endpoint=caller,
+        model=model,
+        prompt_chars=len(full_prompt),
+    )
+    tracker.start()
+
+    copilot_log.debug("System message:\n%s", system_message)
+    copilot_log.debug("User prompt (%d chars):\n%s", len(prompt), prompt)
+
+    cli_path = find_copilot_cli()
+    if not cli_path:
+        tracker.finish(success=False, error="Copilot CLI not found")
+        raise HTTPException(
+            status_code=503,
+            detail="Copilot CLI not found. Install github-copilot-sdk: pip install github-copilot-sdk"
+        )
+
+    copilot_log.info("CLI Path: %s", cli_path)
+    copilot_log.info("Model: %s  |  Prompt chars: %d", model, len(full_prompt))
+
     try:
-        # Run copilot CLI in non-interactive mode
-        # -p = prompt, -s = silent (only output response), --allow-all-tools = no permission prompts
         cmd = [
             cli_path,
             "-p", full_prompt,
-            "-s",  # Silent mode - only output response
-            "--allow-all-tools",  # Don't prompt for permissions
+            "-s",
+            "--allow-all-tools",
             "--model", model,
         ]
-        
-        logger.info(f"📡 Running command: {cmd[0]} -p '...' -s --allow-all-tools --model {model}")
-        
-        # Run the process
+
+        copilot_log.debug("Command: %s -p '...' -s --allow-all-tools --model %s", cmd[0], model)
+
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=os.getcwd()
         )
-        
+
         stdout, stderr = await asyncio.wait_for(
             process.communicate(),
-            timeout=120  # 2 minute timeout
+            timeout=120
         )
-        
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        
+
         stdout_text = stdout.decode('utf-8', errors='replace').strip()
         stderr_text = stderr.decode('utf-8', errors='replace').strip()
-        
-        logger.info(f"   ✓ Process completed in {elapsed_ms}ms with exit code {process.returncode}")
-        logger.info(f"   stdout length: {len(stdout_text)} chars")
+
+        # Log full stderr to copilot log (may contain token info)
         if stderr_text:
-            logger.warning(f"   stderr: {stderr_text[:500]}...")
-        
+            copilot_log.debug("stderr output:\n%s", stderr_text)
+
         if process.returncode != 0:
-            logger.error(f"❌ CLI returned non-zero exit code: {process.returncode}")
-            logger.error(f"   stderr: {stderr_text}")
-            
             # Check for authentication errors
             if "No authentication information found" in stderr_text or "authentication" in stderr_text.lower():
+                err_msg = "Copilot authentication required. Set GITHUB_TOKEN, GH_TOKEN, or COPILOT_GITHUB_TOKEN environment variable."
+                tracker.finish(
+                    success=False,
+                    error=err_msg,
+                    exit_code=process.returncode,
+                    stderr_text=stderr_text,
+                    stdout_text=stdout_text,
+                    response_chars=len(stdout_text),
+                )
                 raise HTTPException(
                     status_code=401,
-                    detail="Copilot authentication required. Set GITHUB_TOKEN, GH_TOKEN, or COPILOT_GITHUB_TOKEN environment variable, or run 'copilot' and use the '/login' command."
+                    detail=err_msg + " Or run 'copilot' and use the '/login' command."
                 )
             
-            raise RuntimeError(f"Copilot CLI failed with exit code {process.returncode}: {stderr_text[:200]}")
-        
-        if stdout_text:
-            logger.info(f"   Content preview: {stdout_text[:500]}...")
-        else:
-            logger.warning("   ⚠️  EMPTY RESPONSE!")
-        
-        logger.info("=" * 60)
-        logger.info(f"✅ [Copilot CLI] GENERATION COMPLETE ({elapsed_ms}ms)")
-        logger.info("=" * 60)
-        
+            err_msg = f"Copilot CLI exit code {process.returncode}: {stderr_text[:200]}"
+            tracker.finish(
+                success=False,
+                error=err_msg,
+                exit_code=process.returncode,
+                stderr_text=stderr_text,
+                stdout_text=stdout_text,
+                response_chars=len(stdout_text),
+            )
+            raise RuntimeError(err_msg)
+
+        copilot_log.debug("Response (%d chars):\n%s", len(stdout_text), stdout_text[:2000])
+
+        if not stdout_text:
+            copilot_log.warning("EMPTY RESPONSE from Copilot CLI")
+
+        # Finalise tracking – this writes the JSONL token record
+        tracker.finish(
+            success=True,
+            exit_code=process.returncode,
+            stderr_text=stderr_text,
+            stdout_text=stdout_text,
+            response_chars=len(stdout_text),
+        )
+
         return stdout_text
-        
+
     except asyncio.TimeoutError:
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        logger.error(f"❌ Copilot CLI timed out after {elapsed_ms}ms")
+        tracker.finish(success=False, error="Timeout after 120s")
         raise RuntimeError("Copilot CLI timed out after 120 seconds")
-        
+
     except Exception as e:
-        elapsed_ms = int((time.time() - start_time) * 1000)
-        logger.error("=" * 60)
-        logger.error(f"❌ [Copilot CLI] GENERATION FAILED after {elapsed_ms}ms")
-        logger.error("=" * 60)
-        logger.error(f"Exception type: {type(e).__name__}")
-        logger.error(f"Exception message: {str(e)}")
-        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        # The tracker may already have been finished above; guard against
+        # double-finish by checking if _start is still set.
+        if tracker._start:
+            tracker.finish(
+                success=False,
+                error=f"{type(e).__name__}: {e}",
+            )
+        copilot_log.error("Full traceback:\n%s", traceback.format_exc())
         raise
 
 
@@ -1356,7 +1376,7 @@ async def generate_questions(
 Remember to output ONLY valid JSON with the questions array."""
 
     try:
-        content = await generate_with_copilot(prompt)
+        content = await generate_with_copilot(prompt, caller="generate_questions")
         questions = parse_questions_from_response(content)
         
         if len(questions) < request.count // 2:
@@ -1447,7 +1467,7 @@ Make the questions {'more challenging' if suggested_difficulty == 'hard' else 'm
 Output ONLY valid JSON with the questions array."""
 
     try:
-        content = await generate_with_copilot(prompt)
+        content = await generate_with_copilot(prompt, caller="generate_dynamic_batch")
         questions = parse_questions_from_response(content)
         
         logger.info(f"✅ Dynamic batch #{request.batch_number}: {len(questions)} questions at {suggested_difficulty} difficulty")
@@ -1492,7 +1512,8 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
     try:
         content = await generate_with_copilot(
             prompt,
-            system_message="You are a fact-checker. Verify trivia answers accurately and concisely. Output ONLY valid JSON."
+            system_message="You are a fact-checker. Verify trivia answers accurately and concisely. Output ONLY valid JSON.",
+            caller="fact_check",
         )
         
         # Parse the response - try to extract JSON
@@ -1547,6 +1568,14 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
         logger.error(f"❌ Fact-check failed: {e}")
         logger.error(f"   Exception type: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Fact-check failed: {str(e)}")
+
+
+# --- Token Usage / Logging Endpoint ---
+
+@app.get("/api/token-usage")
+async def get_token_usage(hours: float = 24):
+    """Return aggregated Copilot token-usage stats from the JSONL log."""
+    return summarize_token_usage(since_hours=hours)
 
 
 # --- Static File Serving (for self-hosted deployment) ---

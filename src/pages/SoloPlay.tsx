@@ -414,9 +414,9 @@ export default function SoloPlay() {
   // Playing Phase
   if (phase === 'playing' && currentQuestion) {
     return (
-      <div className="min-h-screen p-6 flex flex-col">
+      <div className="h-[100dvh] p-4 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex justify-between items-center mb-2 shrink-0">
           <div className="text-white/60">
             Question {currentIndex + 1} / {questions.length}
           </div>
@@ -434,7 +434,7 @@ export default function SoloPlay() {
 
         {/* Timer */}
         {timerEnabled && timeRemaining !== null && !showResult && (
-          <div className="mb-4">
+          <div className="mb-2 shrink-0">
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-1000 ${
@@ -450,15 +450,15 @@ export default function SoloPlay() {
         )}
 
         {/* Question */}
-        <div className="flex-1 flex flex-col justify-center max-w-2xl mx-auto w-full">
-          <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 mb-6">
-            <h2 className="text-2xl md:text-3xl font-bold text-center">
+        <div className="flex-1 flex flex-col min-h-0 max-w-2xl mx-auto w-full">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 md:p-8 mb-3 shrink-0">
+            <h2 className="text-lg md:text-3xl font-bold text-center">
               {currentQuestion.question}
             </h2>
           </div>
 
           {/* Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 flex-1 min-h-0 auto-rows-fr">
             {currentQuestion.options.map((option, index) => {
               let bgClass = 'bg-white/10 hover:bg-white/20 border-white/20 hover:border-white/40'
               
@@ -477,11 +477,11 @@ export default function SoloPlay() {
                   key={index}
                   onClick={() => !showResult && handleAnswer(index)}
                   disabled={showResult}
-                  className={`p-6 rounded-2xl border-2 text-left transition-all ${bgClass} ${
+                  className={`px-4 py-3 md:p-6 rounded-2xl border-2 text-left transition-all flex items-center ${bgClass} ${
                     !showResult ? 'hover:scale-102 active:scale-98' : ''
                   }`}
                 >
-                  <span className="text-lg">{option}</span>
+                  <span className="text-sm md:text-lg line-clamp-2">{option}</span>
                 </button>
               )
             })}
@@ -489,23 +489,23 @@ export default function SoloPlay() {
 
           {/* Result feedback */}
           {showResult && (
-            <div className="mt-6 text-center animate-slide-up">
+            <div className="mt-3 text-center animate-slide-up shrink-0">
               {selectedAnswer === currentQuestion.correct ? (
-                <div className="text-green-400 text-2xl font-bold mb-2">
+                <div className="text-green-400 text-xl font-bold mb-1">
                   ✅ Correct! +{currentQuestion.points}{streak > 1 ? ` +${Math.min(streak - 1, 5) * 50} streak bonus` : ''}
                 </div>
               ) : selectedAnswer === -1 ? (
-                <div className="text-red-400 text-2xl font-bold mb-2">
+                <div className="text-red-400 text-xl font-bold mb-1">
                   ⏱️ Time's up!
                 </div>
               ) : (
-                <div className="text-red-400 text-2xl font-bold mb-2">
+                <div className="text-red-400 text-xl font-bold mb-1">
                   ❌ Incorrect
                 </div>
               )}
               
               {currentQuestion.explanation && (
-                <p className="text-white/70 mb-4">{currentQuestion.explanation}</p>
+                <p className="text-white/70 text-sm mb-2">{currentQuestion.explanation}</p>
               )}
 
               <button
