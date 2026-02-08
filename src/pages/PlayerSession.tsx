@@ -22,6 +22,9 @@ export default function PlayerSession() {
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
   const [myRank, setMyRank] = useState<number | null>(null)
   
+  // Track when question was shown for response time measurement
+  const questionShownAtRef = useRef<number>(Date.now())
+  
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
@@ -49,6 +52,8 @@ export default function PlayerSession() {
           // Reset answer state for new question
           setSelectedAnswer(null)
           setAnswerLocked(false)
+          // Record when this question was shown
+          questionShownAtRef.current = Date.now()
           break
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
@@ -85,8 +90,9 @@ export default function PlayerSession() {
     const handleAutoSubmit = async () => {
       if (selectedAnswer === null || !code || !playerId || !session) return
       setAnswerLocked(true)
+      const responseTimeMs = Date.now() - questionShownAtRef.current
       try {
-        await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+        await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer, responseTimeMs)
       } catch {
         // Silent fail on auto-submit
       }
@@ -119,8 +125,9 @@ export default function PlayerSession() {
     if (selectedAnswer === null || !code || !playerId || !session) return
     
     setAnswerLocked(true)
+    const responseTimeMs = Date.now() - questionShownAtRef.current
     try {
-      await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+      await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer, responseTimeMs)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to submit answer')
       setAnswerLocked(false)

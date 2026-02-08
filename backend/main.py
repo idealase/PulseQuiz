@@ -116,6 +116,7 @@ class AnswerRequest(BaseModel):
     playerId: str
     questionIndex: int
     choice: int
+    response_time_ms: Optional[int] = None  # Client-measured response time in milliseconds
 
 
 class ObserveResponse(BaseModel):
@@ -713,6 +714,131 @@ async def upload_questions(
     return {"ok": True, "count": len(request.questions)}
 
 
+@app.post("/api/session/{code}/append-questions")
+async def append_questions(
+    code: str,
+    request: UploadQuestionsRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Append questions to a session mid-game (host only). Enables dynamic batching."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+    
+    if session.status not in ('lobby', 'playing'):
+        raise HTTPException(status_code=400, detail="Cannot append questions after reveal")
+    
+    if not request.questions:
+        raise HTTPException(status_code=400, detail="No questions provided")
+    
+    # Append to existing questions instead of replacing
+    previous_count = len(session.questions)
+    session.questions.extend(request.questions)
+    new_count = len(session.questions)
+    
+    logger.info(f"📝 Appended {len(request.questions)} questions to session {code} ({previous_count} -> {new_count})")
+    
+    # Broadcast questions_updated event to all clients
+    await broadcast_to_session(code, {
+        'type': 'questions_updated',
+        'totalQuestions': new_count,
+        'addedCount': len(request.questions)
+    })
+    
+    # Also send updated session state so clients have the new question list
+    await broadcast_to_session(code, {
+        'type': 'session_state',
+        'state': session.to_state().model_dump()
+    })
+    
+    return {"ok": True, "previousCount": previous_count, "newCount": new_count, "appended": len(request.questions)}
+
+
+@app.get("/api/session/{code}/performance")
+async def get_performance(
+    code: str,
+    x_host_token: str = Header(alias="X-Host-Token"),
+    last_n: int = 5
+):
+    """Get performance metrics for the session (host only). Used for adaptive difficulty."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+    
+    players = list(session.players.values())
+    if not players:
+        return {
+            "avg_score_percent": 0.0,
+            "avg_response_time_ms": 0,
+            "player_count": 0,
+            "questions_answered": 0,
+            "per_question": []
+        }
+    
+    # Determine question range to analyze (last N questions up to current)
+    current_idx = session.current_question_index
+    start_idx = max(0, current_idx - last_n + 1)
+    question_range = range(start_idx, current_idx + 1)
+    
+    total_correct = 0
+    total_attempts = 0
+    total_response_time_ms = 0
+    response_time_count = 0
+    
+    per_question_stats = []
+    
+    for q_idx in question_range:
+        if q_idx >= len(session.questions):
+            continue
+        question = session.questions[q_idx]
+        q_correct = 0
+        q_attempts = 0
+        q_total_time_ms = 0
+        q_time_count = 0
+        
+        for player in players:
+            if q_idx in player.answers:
+                q_attempts += 1
+                total_attempts += 1
+                if player.answers[q_idx] == question.correct:
+                    q_correct += 1
+                    total_correct += 1
+                
+                if q_idx in player.answer_times:
+                    time_ms = int(player.answer_times[q_idx] * 1000)
+                    q_total_time_ms += time_ms
+                    q_time_count += 1
+                    total_response_time_ms += time_ms
+                    response_time_count += 1
+        
+        per_question_stats.append({
+            "questionIndex": q_idx,
+            "correct": q_correct,
+            "attempts": q_attempts,
+            "score_percent": round((q_correct / q_attempts * 100), 1) if q_attempts > 0 else 0.0,
+            "avg_response_time_ms": int(q_total_time_ms / q_time_count) if q_time_count > 0 else 0
+        })
+    
+    avg_score_percent = round((total_correct / total_attempts * 100), 1) if total_attempts > 0 else 0.0
+    avg_response_time_ms = int(total_response_time_ms / response_time_count) if response_time_count > 0 else 0
+    
+    return {
+        "avg_score_percent": avg_score_percent,
+        "avg_response_time_ms": avg_response_time_ms,
+        "player_count": len(players),
+        "questions_answered": total_attempts,
+        "per_question": per_question_stats
+    }
+
+
 @app.post("/api/session/{code}/start")
 async def start_round(code: str, x_host_token: str = Header(alias="X-Host-Token")):
     """Start the quiz round (host only)"""
@@ -839,9 +965,12 @@ async def submit_answer(code: str, request: AnswerRequest):
     
     player.answers[request.questionIndex] = request.choice
     
-    # Record answer time
-    start_time = session.question_start_times.get(request.questionIndex, time.time())
-    player.answer_times[request.questionIndex] = time.time() - start_time
+    # Record answer time - prefer client-measured time, fall back to server-side calculation
+    if request.response_time_ms is not None and request.response_time_ms >= 0:
+        player.answer_times[request.questionIndex] = request.response_time_ms / 1000.0
+    else:
+        start_time = session.question_start_times.get(request.questionIndex, time.time())
+        player.answer_times[request.questionIndex] = time.time() - start_time
     
     # Get answer status (who has/hasn't answered)
     answer_status = session.get_answer_status(request.questionIndex)

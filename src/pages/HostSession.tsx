@@ -135,6 +135,10 @@ export default function HostSession() {
         case 'question_stats':
           setQuestionStats(msg.stats)
           break
+        case 'questions_updated':
+          // Questions were appended mid-session; session_state will follow
+          console.log(`📝 Questions updated: +${msg.addedCount} (total: ${msg.totalQuestions})`)
+          break
         case 'error':
           setError(msg.message)
           break
@@ -198,27 +202,27 @@ export default function HostSession() {
     
     setGeneratingBatch(true)
     try {
-      // NOTE: Cannot calculate accurate performance because backend hides correct answers during play
-      // (session.questions[i].correct is set to -1). Using placeholder metrics for now.
-      // TODO: Backend should provide performance stats or expose correct answers to host
+      // Fetch real performance metrics from the backend
+      let performanceData
+      try {
+        performanceData = await api.getPerformance(code, hostToken, dynamicConfig.batchSize)
+      } catch (perfErr) {
+        console.warn('⚠️  Could not fetch performance data, using defaults:', perfErr)
+        performanceData = {
+          avg_score_percent: 60,
+          avg_response_time_ms: 8000,
+          player_count: session.players.length,
+          questions_answered: Math.min(session.currentQuestionIndex + 1, 5)
+        }
+      }
       
-      const players = session.players
       const nextBatchNumber = dynamicConfig.currentBatch + 1
       const questionsToGenerate = Math.min(
         dynamicConfig.batchSize,
         dynamicConfig.targetCount - session.questions.length
       )
       
-      // Use placeholder performance metrics since we can't calculate real ones
-      const placeholderPerformance = {
-        avg_score_percent: 60,  // Neutral default
-        avg_response_time_ms: 8000,  // Neutral default
-        player_count: players.length,
-        questions_answered: Math.min(session.currentQuestionIndex + 1, 5)
-      }
-      
-      console.log(`🎲 Generating batch #${nextBatchNumber}: ${questionsToGenerate} questions (using placeholder performance metrics)`)
-      console.warn('⚠️  Performance-based difficulty adjustment is limited because correct answers are hidden during play')
+      console.log(`🎲 Generating batch #${nextBatchNumber}: ${questionsToGenerate} questions (performance: ${performanceData.avg_score_percent}% correct, ${performanceData.avg_response_time_ms}ms avg)`)
       
       const result = await api.generateDynamicBatch({
         topics: dynamicConfig.topics,
@@ -226,22 +230,12 @@ export default function HostSession() {
         batch_number: nextBatchNumber,
         batch_size: questionsToGenerate,
         previous_difficulty: dynamicConfig.lastDifficulty || 'medium',
-        performance: placeholderPerformance
+        performance: performanceData
       }, dynamicConfig.authToken)
       
-      // NOTE: The backend /api/session/{code}/questions endpoint rejects updates after start
-      // This is a known limitation - dynamic batching currently only works if we can append questions
-      if (session.status !== 'lobby') {
-        console.error('❌ Cannot upload questions mid-session - backend only accepts updates in lobby state')
-        setError('Dynamic mode requires backend support for mid-session question updates. This feature is not fully functional yet.')
-        setGeneratingBatch(false)
-        return
-      }
-      
-      // Upload the new questions to the session (only works in lobby)
+      // Append questions mid-session using the new endpoint
       if (result.questions.length > 0) {
-        const allQuestions = [...session.questions, ...result.questions]
-        await api.uploadQuestions(code, hostToken, allQuestions)
+        await api.appendQuestions(code, hostToken, result.questions)
         
         // Update dynamic config with last difficulty for next batch
         const updatedConfig = { 
@@ -252,16 +246,12 @@ export default function HostSession() {
         setDynamicConfig(updatedConfig)
         sessionStorage.setItem(`dynamic_${code}`, JSON.stringify(updatedConfig))
         
-        console.log(`✅ Added ${result.questions.length} new questions (${result.suggested_difficulty} difficulty)`)
+        console.log(`✅ Appended ${result.questions.length} new questions (${result.suggested_difficulty} difficulty)`)
       }
     } catch (e) {
       console.error('Failed to generate next batch:', e)
       const errorMsg = e instanceof Error ? e.message : 'Failed to generate next batch'
-      if (errorMsg.includes('Cannot modify questions after start')) {
-        setError('Dynamic batching cannot add questions after the session starts. This requires backend changes to support mid-game question updates.')
-      } else {
-        setError(errorMsg)
-      }
+      setError(errorMsg)
     }
     setGeneratingBatch(false)
   }

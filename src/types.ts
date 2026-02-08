@@ -68,6 +68,7 @@ export type ServerMessage =
   | { type: 'timer_tick'; remaining: number; questionIndex: number }
   | { type: 'leaderboard_update'; leaderboard: LiveLeaderboardEntry[] }
   | { type: 'question_stats'; stats: QuestionStats }
+  | { type: 'questions_updated'; totalQuestions: number; addedCount: number }
   | { type: 'error'; message: string }
 
 export interface RevealResults {
@@ -91,6 +92,20 @@ export interface QuestionResult {
   points: number
   yourAnswer?: number
   answeredCorrectly?: boolean
+}
+
+export interface PerformanceData {
+  avg_score_percent: number
+  avg_response_time_ms: number
+  player_count: number
+  questions_answered: number
+  per_question?: {
+    questionIndex: number
+    correct: number
+    attempts: number
+    score_percent: number
+    avg_response_time_ms: number
+  }[]
 }
 
 // Messages to server
