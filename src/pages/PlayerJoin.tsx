@@ -86,7 +86,7 @@ export default function PlayerJoin() {
           <button
             type="submit"
             disabled={loading || !code.trim() || !nickname.trim()}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Joining...' : 'Join'}
           </button>

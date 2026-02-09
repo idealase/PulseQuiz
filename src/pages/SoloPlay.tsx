@@ -213,7 +213,7 @@ export default function SoloPlay() {
             ← Back
           </Link>
 
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-bold mb-2 text-yellow-400">
             🎯 Solo Mode
           </h1>
           <p className="text-white/60 mb-8">Practice on your own - no pressure!</p>
@@ -225,7 +225,7 @@ export default function SoloPlay() {
           )}
 
           {/* AI Generation Section */}
-          <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-2xl p-6 mb-6">
+          <div className="bg-indigo-500/20 border border-indigo-500/30 rounded-2xl p-6 mb-6">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
               <span className="text-2xl">🤖</span> AI Quiz Generator
             </h2>
@@ -290,7 +290,7 @@ export default function SoloPlay() {
               <button
                 onClick={handleAiGenerate}
                 disabled={aiGenerating || !aiTopics.trim()}
-                className="w-full py-3 px-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl font-bold hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 bg-indigo-500 rounded-xl font-bold hover:bg-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {aiGenerating ? (
                   <span className="flex items-center justify-center gap-2">
@@ -402,7 +402,7 @@ export default function SoloPlay() {
           <button
             onClick={startGame}
             disabled={questions.length === 0}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-yellow-500 hover:bg-yellow-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
           >
             🎮 Start Solo Quiz!
           </button>
@@ -510,7 +510,7 @@ export default function SoloPlay() {
 
               <button
                 onClick={nextQuestion}
-                className="px-8 py-3 bg-gradient-to-r from-primary to-indigo-500 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all"
+                className="px-8 py-3 bg-primary rounded-xl font-bold hover:bg-indigo-600 hover:scale-105 active:scale-95 transition-all"
               >
                 {currentIndex >= questions.length - 1 ? 'See Results' : 'Next Question'} →
               </button>
@@ -593,7 +593,7 @@ export default function SoloPlay() {
           <div className="flex flex-col gap-3">
             <button
               onClick={playAgain}
-              className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all hover:scale-105 active:scale-95"
+              className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-yellow-500 hover:bg-yellow-400 transition-all hover:scale-105 active:scale-95"
             >
               🔄 Play Again
             </button>

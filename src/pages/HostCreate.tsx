@@ -249,7 +249,7 @@ export default function HostCreate() {
           <button
             onClick={handleCreateSession}
             disabled={loading}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Creating...' : 'Create Session'}
           </button>
@@ -309,7 +309,7 @@ export default function HostCreate() {
           </div>
 
           {/* AI Quiz Generation */}
-          <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-2xl p-6">
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <span>✨</span> Generate with AI
             </h3>
@@ -388,7 +388,7 @@ export default function HostCreate() {
             <button
               onClick={handleAiGenerate}
               disabled={aiGenerating || !aiTopics.trim()}
-              className="w-full py-3 px-6 font-bold rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 px-6 font-bold rounded-xl bg-purple-500 hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {aiGenerating ? (
                 <>
@@ -486,7 +486,7 @@ export default function HostCreate() {
           <button
             onClick={handleStartSession}
             disabled={loading || questions.length === 0}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-green-500 hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Starting...' : `Start with ${questions.length} Questions`}
           </button>
