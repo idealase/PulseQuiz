@@ -147,7 +147,7 @@ export default function PlayerSession() {
   }
 
   // Option colors for visual variety
-  const optionColors = [
+  const optionBackgrounds = [
     'bg-red-500',
     'bg-blue-500',
     'bg-yellow-500',
@@ -247,11 +247,11 @@ export default function PlayerSession() {
                   className={`px-3 py-2 rounded-xl text-left text-sm font-medium transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
-                        ? `${optionColors[i]} opacity-100`
+                        ? `${optionBackgrounds[i]} opacity-100`
                         : 'bg-white/5 opacity-50'
                       : selectedAnswer === i
-                        ? `${optionColors[i]} ring-4 ring-white/50`
-                        : `${optionColors[i]} opacity-80 hover:opacity-100`
+                        ? `${optionBackgrounds[i]} ring-4 ring-white/50`
+                        : `${optionBackgrounds[i]} opacity-80 hover:opacity-100`
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
