@@ -8,6 +8,17 @@ import { questionSets, getShuffledQuestionsFromSet, QuestionSetId } from '../dat
 
 type GamePhase = 'setup' | 'playing' | 'result'
 
+type DynamicConfig = {
+  enabled: boolean
+  topics: string
+  authToken: string
+  targetCount: number
+  batchSize: number
+  currentBatch: number
+  lastDifficulty: string
+  sessionCode: string
+}
+
 export default function SoloPlay() {
   const config = useConfig()
   const api = new ApiClient(config.apiBaseUrl)
@@ -21,10 +32,13 @@ export default function SoloPlay() {
   const [aiTopics, setAiTopics] = useState('')
   const [aiQuestionCount, setAiQuestionCount] = useState(10)
   const [aiResearchMode, setAiResearchMode] = useState(false)
+  const [aiDynamicMode, setAiDynamicMode] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiAuthToken, setAiAuthToken] = useState(() => localStorage.getItem('quiz_auth_token') || '')
   const [generationTime, setGenerationTime] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [dynamicConfig, setDynamicConfig] = useState<DynamicConfig | null>(null)
+  const [generatingBatch, setGeneratingBatch] = useState(false)
 
   // Game phase state
   const [phase, setPhase] = useState<GamePhase>('setup')
@@ -32,9 +46,10 @@ export default function SoloPlay() {
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null)
   const [showResult, setShowResult] = useState(false)
   const [score, setScore] = useState(0)
-  const [answers, setAnswers] = useState<{ questionIndex: number; selected: number; correct: boolean }[]>([])
+  const [answers, setAnswers] = useState<{ questionIndex: number; selected: number; correct: boolean; responseTimeMs?: number }[]>([])
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
+  const [questionStartTime, setQuestionStartTime] = useState<number | null>(null)
 
   // Timer
   const [timerEnabled, setTimerEnabled] = useState(false)
@@ -58,6 +73,12 @@ export default function SoloPlay() {
     return () => clearTimeout(timer)
   }, [phase, showResult, timerEnabled, timeRemaining])
 
+  useEffect(() => {
+    if (phase === 'playing') {
+      setQuestionStartTime(Date.now())
+    }
+  }, [phase, currentIndex])
+
   const handleFileUpload = useCallback((file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
@@ -72,6 +93,7 @@ export default function SoloPlay() {
       }
       
       setQuestions(result.questions)
+      setDynamicConfig(null)
     }
     reader.readAsText(file)
   }, [])
@@ -94,6 +116,70 @@ export default function SoloPlay() {
     const presetQuestions = getShuffledQuestionsFromSet(setId, count)
     setQuestions(presetQuestions)
     setCsvErrors([])
+    setDynamicConfig(null)
+  }
+
+  const buildDynamicPerformance = (batchSize: number) => {
+    const recentAnswers = answers.slice(-batchSize)
+    if (recentAnswers.length === 0) {
+      return {
+        avg_score_percent: 60,
+        avg_response_time_ms: 8000,
+        player_count: 1,
+        questions_answered: 0
+      }
+    }
+
+    const correctCount = recentAnswers.filter(a => a.correct).length
+    const avgScore = (correctCount / recentAnswers.length) * 100
+    const timingValues = recentAnswers
+      .map(a => a.responseTimeMs)
+      .filter((value): value is number => typeof value === 'number' && !Number.isNaN(value))
+    const avgTime = timingValues.length > 0
+      ? Math.round(timingValues.reduce((sum, value) => sum + value, 0) / timingValues.length)
+      : 8000
+
+    return {
+      avg_score_percent: Number(avgScore.toFixed(1)),
+      avg_response_time_ms: avgTime,
+      player_count: 1,
+      questions_answered: recentAnswers.length
+    }
+  }
+
+  const generateNextBatch = async () => {
+    if (!dynamicConfig) return
+    const remaining = dynamicConfig.targetCount - questions.length
+    if (remaining <= 0) return
+
+    setGeneratingBatch(true)
+    setError(null)
+    try {
+      const nextBatchNumber = dynamicConfig.currentBatch + 1
+      const batchSize = Math.min(dynamicConfig.batchSize, remaining)
+      const performance = buildDynamicPerformance(dynamicConfig.batchSize)
+
+      const result = await api.generateDynamicBatch({
+        topics: dynamicConfig.topics,
+        session_code: dynamicConfig.sessionCode,
+        batch_number: nextBatchNumber,
+        batch_size: batchSize,
+        previous_difficulty: dynamicConfig.lastDifficulty || 'medium',
+        performance
+      }, dynamicConfig.authToken)
+
+      if (result.questions.length > 0) {
+        setQuestions(prev => [...prev, ...result.questions])
+        setDynamicConfig(prev => prev ? {
+          ...prev,
+          currentBatch: nextBatchNumber,
+          lastDifficulty: result.suggested_difficulty
+        } : prev)
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to generate next batch')
+    }
+    setGeneratingBatch(false)
   }
 
   const handleAiGenerate = async () => {
@@ -110,20 +196,44 @@ export default function SoloPlay() {
     setAiGenerating(true)
     setError(null)
     setGenerationTime(null)
+    setCsvErrors([])
+    setDynamicConfig(null)
     const startTime = Date.now()
 
     try {
       localStorage.setItem('quiz_auth_token', aiAuthToken)
+
+      const dynamicEnabled = aiDynamicMode
+      const initialBatchSize = dynamicEnabled ? Math.min(5, aiQuestionCount) : aiQuestionCount
       
       const result = await api.generateQuestions({
         topics: aiTopics.trim(),
-        count: aiQuestionCount,
+        count: initialBatchSize,
         research_mode: aiResearchMode
       }, aiAuthToken)
 
       setQuestions(result.questions)
       setCsvErrors([])
       setGenerationTime(Date.now() - startTime)
+
+      if (dynamicEnabled) {
+        const sessionCode = `solo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
+        setDynamicConfig({
+          enabled: true,
+          topics: aiTopics.trim(),
+          authToken: aiAuthToken,
+          targetCount: aiQuestionCount,
+          batchSize: 5,
+          currentBatch: 1,
+          lastDifficulty: 'medium',
+          sessionCode
+        })
+        setCsvErrors([
+          `Dynamic Mode: Generated initial batch of ${result.questions.length} questions. Target: ${aiQuestionCount} total.`
+        ])
+      } else {
+        setDynamicConfig(null)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to generate questions')
     }
@@ -148,6 +258,7 @@ export default function SoloPlay() {
     
     const question = questions[currentIndex]
     const isCorrect = answerIndex === question.correct
+    const responseTimeMs = questionStartTime ? Date.now() - questionStartTime : undefined
     
     setSelectedAnswer(answerIndex)
     setShowResult(true)
@@ -168,11 +279,19 @@ export default function SoloPlay() {
     setAnswers(prev => [...prev, { 
       questionIndex: currentIndex, 
       selected: answerIndex, 
-      correct: isCorrect 
+      correct: isCorrect,
+      responseTimeMs
     }])
   }
 
-  const nextQuestion = () => {
+  const nextQuestion = async () => {
+    if (dynamicConfig && !generatingBatch) {
+      const questionsRemaining = questions.length - currentIndex - 1
+      if (questionsRemaining <= 2 && questions.length < dynamicConfig.targetCount) {
+        await generateNextBatch()
+      }
+    }
+
     if (currentIndex >= questions.length - 1) {
       setPhase('result')
     } else {
@@ -191,6 +310,8 @@ export default function SoloPlay() {
     setAnswers([])
     setStreak(0)
     setBestStreak(0)
+    setDynamicConfig(null)
+    setGeneratingBatch(false)
   }
 
   const playAgain = () => {
@@ -270,6 +391,17 @@ export default function SoloPlay() {
                   <span className="text-sm">🔬 Research Mode</span>
                 </label>
               </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={aiDynamicMode}
+                  onChange={(e) => setAiDynamicMode(e.target.checked)}
+                  className="w-5 h-5 rounded"
+                  disabled={aiGenerating}
+                />
+                <span className="text-sm">🎲 Dynamic Mode (adapts difficulty)</span>
+              </label>
 
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -413,14 +545,21 @@ export default function SoloPlay() {
 
   // Playing Phase
   if (phase === 'playing' && currentQuestion) {
+    const totalQuestions = dynamicConfig ? dynamicConfig.targetCount : questions.length
     return (
       <div className="h-[100dvh] p-4 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center mb-2 shrink-0">
           <div className="text-white/60">
-            Question {currentIndex + 1} / {questions.length}
+            Question {currentIndex + 1} / {totalQuestions}
           </div>
           <div className="flex items-center gap-4">
+            {dynamicConfig && (
+              <div className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs font-bold">
+                🎲 Dynamic {questions.length}/{dynamicConfig.targetCount}
+                {generatingBatch && <span className="ml-1 animate-pulse">• Generating</span>}
+              </div>
+            )}
             {streak > 1 && (
               <div className="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-sm font-bold">
                 🔥 {streak} streak!
@@ -510,9 +649,14 @@ export default function SoloPlay() {
 
               <button
                 onClick={nextQuestion}
+                disabled={generatingBatch}
                 className="px-8 py-3 bg-gradient-to-r from-primary to-indigo-500 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all"
               >
-                {currentIndex >= questions.length - 1 ? 'See Results' : 'Next Question'} →
+                {generatingBatch
+                  ? 'Generating next batch...'
+                  : currentIndex >= questions.length - 1
+                    ? 'See Results'
+                    : 'Next Question'} →
               </button>
             </div>
           )}
