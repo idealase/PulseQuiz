@@ -72,7 +72,7 @@ export default function AudienceJoin() {
           <button
             type="submit"
             disabled={loading || code.length < 4}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-purple-500 hover:bg-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Connecting...' : '👁️ Watch'}
           </button>

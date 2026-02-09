@@ -148,10 +148,10 @@ export default function PlayerSession() {
 
   // Option colors for visual variety
   const optionColors = [
-    'from-red-500 to-red-600',
-    'from-blue-500 to-blue-600',
-    'from-yellow-500 to-yellow-600',
-    'from-green-500 to-green-600',
+    'bg-red-500',
+    'bg-blue-500',
+    'bg-yellow-500',
+    'bg-green-500',
   ]
 
   return (
@@ -247,11 +247,11 @@ export default function PlayerSession() {
                   className={`px-3 py-2 rounded-xl text-left text-sm font-medium transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
-                        ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
+                        ? `${optionColors[i]} opacity-100`
                         : 'bg-white/5 opacity-50'
                       : selectedAnswer === i
-                        ? `bg-gradient-to-r ${optionColors[i]} ring-4 ring-white/50`
-                        : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
+                        ? `${optionColors[i]} ring-4 ring-white/50`
+                        : `${optionColors[i]} opacity-80 hover:opacity-100`
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
@@ -287,7 +287,7 @@ export default function PlayerSession() {
         <div className="flex-1 animate-slide-up overflow-y-auto min-h-0">
           {/* My Score */}
           {myScore && (
-            <div className="bg-gradient-to-r from-primary to-secondary rounded-2xl p-6 text-center mb-6">
+            <div className="bg-primary rounded-2xl p-6 text-center mb-6">
               <p className="text-white/80 mb-1">Your Score</p>
               <p className="text-5xl font-black">{myScore.score}</p>
               <p className="mt-2 text-xl">
@@ -336,7 +336,7 @@ export default function PlayerSession() {
           <div className="flex gap-3 mb-6">
             <Link
               to="/join"
-              className="flex-1 py-3 text-center font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all"
+              className="flex-1 py-3 text-center font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all"
             >
               🎮 Join New Game
             </Link>

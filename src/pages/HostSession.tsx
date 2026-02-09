@@ -258,7 +258,7 @@ export default function HostSession() {
           <button
             onClick={handleStart}
             disabled={loading || session.players.length === 0}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-green-500 hover:bg-green-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Starting...' : 'Start Round'}
           </button>
@@ -470,7 +470,7 @@ export default function HostSession() {
                 <button
                   onClick={handleReveal}
                   disabled={loading}
-                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50"
+                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-amber-500 hover:bg-amber-600 transition-all disabled:opacity-50"
                 >
                   🏆 Reveal Results
                 </button>
@@ -548,7 +548,7 @@ export default function HostSession() {
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               to="/host"
-              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all hover:scale-105 active:scale-95"
+              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-primary hover:bg-indigo-600 transition-all hover:scale-105 active:scale-95"
             >
               🎮 Host New Game
             </Link>

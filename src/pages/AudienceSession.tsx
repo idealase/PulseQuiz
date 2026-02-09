@@ -282,7 +282,7 @@ export default function AudienceSession() {
           {/* Revealed State - Final Results */}
           {session.status === 'revealed' && results && (
             <div className="space-y-4 animate-slide-up">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-center">
+              <div className="bg-amber-500 rounded-2xl p-6 text-center">
                 <h2 className="text-3xl font-black">🏆 Final Results</h2>
               </div>
 
@@ -349,7 +349,7 @@ export default function AudienceSession() {
                 <div 
                   key={entry.id}
                   className={`flex items-center p-4 ${i > 0 ? 'border-t border-white/10' : ''} ${
-                    i < 3 ? 'bg-gradient-to-r from-white/5 to-transparent' : ''
+                    i < 3 ? 'bg-white/5' : ''
                   }`}
                 >
                   <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mr-4 ${
