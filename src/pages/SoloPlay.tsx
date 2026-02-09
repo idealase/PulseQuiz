@@ -204,7 +204,7 @@ export default function SoloPlay() {
       localStorage.setItem('quiz_auth_token', aiAuthToken)
 
       const dynamicEnabled = aiDynamicMode
-      const initialBatchSize = dynamicEnabled ? Math.min(5, aiQuestionCount) : aiQuestionCount
+      const initialBatchSize = dynamicEnabled ? Math.min(10, aiQuestionCount) : aiQuestionCount
       
       const result = await api.generateQuestions({
         topics: aiTopics.trim(),
@@ -223,7 +223,7 @@ export default function SoloPlay() {
           topics: aiTopics.trim(),
           authToken: aiAuthToken,
           targetCount: aiQuestionCount,
-          batchSize: 5,
+          batchSize: 10,
           currentBatch: 1,
           lastDifficulty: 'medium',
           sessionCode
@@ -285,14 +285,20 @@ export default function SoloPlay() {
   }
 
   const nextQuestion = async () => {
-    if (dynamicConfig && !generatingBatch) {
+    const isAtLastLoadedQuestion = currentIndex >= questions.length - 1
+    const needsMoreQuestions = dynamicConfig ? questions.length < dynamicConfig.targetCount : false
+
+    if (dynamicConfig) {
       const questionsRemaining = questions.length - currentIndex - 1
-      if (questionsRemaining <= 2 && questions.length < dynamicConfig.targetCount) {
-        await generateNextBatch()
+      if (!generatingBatch && questionsRemaining <= 5 && needsMoreQuestions) {
+        void generateNextBatch()
+      }
+      if (isAtLastLoadedQuestion && needsMoreQuestions) {
+        return
       }
     }
 
-    if (currentIndex >= questions.length - 1) {
+    if (isAtLastLoadedQuestion) {
       setPhase('result')
     } else {
       setCurrentIndex(i => i + 1)
@@ -372,7 +378,7 @@ export default function SoloPlay() {
                   <input
                     type="range"
                     min="5"
-                    max="20"
+                    max="50"
                     value={aiQuestionCount}
                     onChange={(e) => setAiQuestionCount(Number(e.target.value))}
                     className="w-full"
@@ -546,6 +552,9 @@ export default function SoloPlay() {
   // Playing Phase
   if (phase === 'playing' && currentQuestion) {
     const totalQuestions = dynamicConfig ? dynamicConfig.targetCount : questions.length
+    const isAtLastLoadedQuestion = currentIndex >= questions.length - 1
+    const needsMoreQuestions = dynamicConfig ? questions.length < dynamicConfig.targetCount : false
+    const shouldBlockForBatch = generatingBatch && isAtLastLoadedQuestion && needsMoreQuestions
     return (
       <div className="h-[100dvh] p-4 flex flex-col overflow-hidden">
         {/* Header */}
@@ -649,10 +658,10 @@ export default function SoloPlay() {
 
               <button
                 onClick={nextQuestion}
-                disabled={generatingBatch}
-                className="px-8 py-3 bg-gradient-to-r from-primary to-indigo-500 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all"
+                disabled={shouldBlockForBatch}
+                className="px-8 py-3 bg-gradient-to-r from-primary to-indigo-500 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {generatingBatch
+                {shouldBlockForBatch
                   ? 'Generating next batch...'
                   : currentIndex >= questions.length - 1
                     ? 'See Results'

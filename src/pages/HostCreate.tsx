@@ -101,7 +101,7 @@ export default function HostCreate() {
     setLoading(true)
     setError(null)
     try {
-      const initialBatchSize = aiDynamicMode ? 5 : questions.length
+      const initialBatchSize = aiDynamicMode ? 10 : questions.length
       const questionsToUpload = aiDynamicMode ? questions.slice(0, initialBatchSize) : questions
       if (aiDynamicMode && questions.length > initialBatchSize) {
         setCsvErrors([`Dynamic Mode: Uploading initial batch of ${initialBatchSize} questions. Remaining questions will be generated during gameplay.`])
@@ -116,7 +116,7 @@ export default function HostCreate() {
           topics: aiTopics,
           authToken: aiAuthToken,
           targetCount: aiQuestionCount,
-          batchSize: 5,
+          batchSize: 10,
           currentBatch: 1,
           lastDifficulty: 'medium'
         }))
@@ -150,9 +150,9 @@ export default function HostCreate() {
     
     try {
       const dynamicEnabled = aiDynamicModeRef.current
-      // In dynamic mode, generate only initial batch of 5 questions
+      // In dynamic mode, generate only initial batch of 10 questions
       // The rest will be generated during gameplay based on performance
-      const initialBatchSize = dynamicEnabled ? 5 : aiQuestionCount
+      const initialBatchSize = dynamicEnabled ? 10 : aiQuestionCount
       
       const result = await api.generateQuestions({
         topics: aiTopics,
@@ -366,7 +366,7 @@ export default function HostCreate() {
               <input
                 type="range"
                 min="5"
-                max="25"
+                max="50"
                 value={aiQuestionCount}
                 onChange={(e) => setAiQuestionCount(Number(e.target.value))}
                 className="w-full accent-purple-500"
@@ -419,7 +419,7 @@ export default function HostCreate() {
                 </>
               ) : (
                 <>
-                  <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (5)' : 'Generate Quiz'}
+                  <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
                 </>
               )}
             </button>

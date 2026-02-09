@@ -176,15 +176,22 @@ export default function HostSession() {
     if (!code || !hostToken) return
     
     // Check if we need to generate next batch in dynamic mode
-    if (dynamicConfig && session && !generatingBatch) {
+    if (dynamicConfig && session) {
       const currentQuestionIndex = session.currentQuestionIndex
       const totalQuestions = session.questions.length
       const questionsRemaining = totalQuestions - currentQuestionIndex - 1
+      const isAtLastLoadedQuestion = currentQuestionIndex >= totalQuestions - 1
+      const needsMoreQuestions = totalQuestions < dynamicConfig.targetCount
       
-      // Generate next batch when we have 2 or fewer questions remaining
+      // Generate next batch when we have 5 or fewer questions remaining
       // and haven't reached target count
-      if (questionsRemaining <= 2 && totalQuestions < dynamicConfig.targetCount) {
-        await generateNextBatch()
+      if (!generatingBatch && questionsRemaining <= 5 && needsMoreQuestions) {
+        void generateNextBatch()
+      }
+
+      // If we're at the last loaded question but need more, wait for batch
+      if (isAtLastLoadedQuestion && needsMoreQuestions) {
+        return
       }
     }
     

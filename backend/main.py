@@ -128,7 +128,7 @@ class ObserveResponse(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     topics: str = Field(description="Comma-separated list of topics")
-    count: int = Field(default=10, ge=3, le=30, description="Number of questions to generate")
+    count: int = Field(default=10, ge=3, le=50, description="Number of questions to generate")
     research_mode: bool = Field(default=False, description="Enable deeper research (uses more AI)")
     difficulty: str = Field(default="mixed", description="easy, medium, hard, or mixed")
 
@@ -152,7 +152,7 @@ class GenerateDynamicBatchRequest(BaseModel):
     batch_number: int
     performance: Optional[PerformanceData] = None
     previous_difficulty: str = "medium"
-    batch_size: int = Field(default=5, ge=3, le=10)
+    batch_size: int = Field(default=10, ge=10, le=10)
 
 
 class GenerateDynamicBatchResponse(BaseModel):
