@@ -5,6 +5,7 @@ param(
     [switch]$UseNgrok,        # Use ngrok instead of Cloudflare Tunnel
     [switch]$SkipDeploy,      # Skip GitHub Pages deploy (ngrok mode only)
     [switch]$SkipBuild,       # Skip frontend build
+    [switch]$CleanRefresh,    # Force clean refresh of frontend/backend dependencies
     [int]$Port = 8000,
     [string]$Message = ""     # Custom message to display on home page
 )
@@ -115,9 +116,17 @@ if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
 # Build frontend if needed (for Cloudflare mode)
 if (-not $UseNgrok -and -not $SkipBuild) {
     $distPath = Join-Path $ScriptDir "dist"
+    if ($CleanRefresh -and (Test-Path $distPath)) {
+        Write-Host "Cleaning dist/ for fresh build..." -ForegroundColor Yellow
+        Remove-Item -Recurse -Force $distPath
+    }
+
     if (-not (Test-Path $distPath)) {
         Write-Host "📦 Building frontend..." -ForegroundColor Yellow
         Set-Location $ScriptDir
+        if ($CleanRefresh) {
+            Write-Host "Running npm install (clean refresh)..." -ForegroundColor Gray
+        }
         npm install
         npm run build
         Write-Host "✅ Frontend built!" -ForegroundColor Green
@@ -166,6 +175,26 @@ if ($existingProcess) {
 
 $backendPath = Join-Path $ScriptDir "backend"
 Write-Host "📂 Backend path: $backendPath" -ForegroundColor Gray
+
+# Optional clean refresh for backend dependencies
+if ($CleanRefresh) {
+    Write-Host "Running backend dependency refresh..." -ForegroundColor Yellow
+    $venvRoot = Join-Path $backendPath "venv"
+    $venvPython = Join-Path $venvRoot "Scripts\python.exe"
+    if (-not (Test-Path $venvPython)) {
+        Write-Host "Creating backend virtual environment..." -ForegroundColor Gray
+        Set-Location $backendPath
+        python -m venv venv
+    }
+
+    $pipPath = Join-Path $venvRoot "Scripts\pip.exe"
+    if (Test-Path $pipPath) {
+        & $pipPath install -r (Join-Path $backendPath "requirements.txt")
+    } else {
+        Write-Host "Warning: venv pip not found; using system pip" -ForegroundColor Yellow
+        pip install -r (Join-Path $backendPath "requirements.txt")
+    }
+}
 
 # Check Python dependencies
 Write-Host "📋 Checking Python dependencies..." -ForegroundColor Gray

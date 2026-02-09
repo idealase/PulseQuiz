@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient } from '../api/client'
@@ -32,6 +32,8 @@ export default function HostCreate() {
   const [aiQuestionCount, setAiQuestionCount] = useState(10)
   const [aiResearchMode, setAiResearchMode] = useState(false)
   const [aiDynamicMode, setAiDynamicMode] = useState(false)
+  const aiDynamicModeRef = useRef(false)
+  const [dynamicToggleGuard, setDynamicToggleGuard] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiAuthToken, setAiAuthToken] = useState(() => localStorage.getItem('quiz_auth_token') || '')
   const [showAuthInput, setShowAuthInput] = useState(() => !localStorage.getItem('quiz_auth_token'))
@@ -99,7 +101,12 @@ export default function HostCreate() {
     setLoading(true)
     setError(null)
     try {
-      await api.uploadQuestions(sessionCode, hostToken, questions)
+      const initialBatchSize = aiDynamicMode ? 10 : questions.length
+      const questionsToUpload = aiDynamicMode ? questions.slice(0, initialBatchSize) : questions
+      if (aiDynamicMode && questions.length > initialBatchSize) {
+        setCsvErrors([`Dynamic Mode: Uploading initial batch of ${initialBatchSize} questions. Remaining questions will be generated during gameplay.`])
+      }
+      await api.uploadQuestions(sessionCode, hostToken, questionsToUpload)
       // Store host token in sessionStorage for the session page
       sessionStorage.setItem(`host_${sessionCode}`, hostToken)
       // Store dynamic mode preference if enabled
@@ -107,7 +114,11 @@ export default function HostCreate() {
         sessionStorage.setItem(`dynamic_${sessionCode}`, JSON.stringify({
           enabled: true,
           topics: aiTopics,
-          authToken: aiAuthToken
+          authToken: aiAuthToken,
+          targetCount: aiQuestionCount,
+          batchSize: 10,
+          currentBatch: 1,
+          lastDifficulty: 'medium'
         }))
       }
       navigate(`/host/${sessionCode}`)
@@ -138,9 +149,14 @@ export default function HostCreate() {
     setCsvErrors([])
     
     try {
+      const dynamicEnabled = aiDynamicModeRef.current
+      // In dynamic mode, generate only initial batch of 10 questions
+      // The rest will be generated during gameplay based on performance
+      const initialBatchSize = dynamicEnabled ? 10 : aiQuestionCount
+      
       const result = await api.generateQuestions({
         topics: aiTopics,
-        count: aiQuestionCount,
+        count: initialBatchSize,
         research_mode: aiResearchMode,
         difficulty: 'mixed'
       }, aiAuthToken)
@@ -148,7 +164,9 @@ export default function HostCreate() {
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
       
-      if (result.questions.length < aiQuestionCount) {
+      if (dynamicEnabled) {
+        setCsvErrors([`Dynamic Mode: Generated initial batch of ${result.questions.length} questions (requested: ${initialBatchSize}). Target: ${aiQuestionCount} total. More will be generated during gameplay.`])
+      } else if (result.questions.length < aiQuestionCount) {
         setCsvErrors([`Generated ${result.questions.length} of ${aiQuestionCount} requested questions`])
       }
     } catch (e) {
@@ -348,7 +366,7 @@ export default function HostCreate() {
               <input
                 type="range"
                 min="5"
-                max="25"
+                max="50"
                 value={aiQuestionCount}
                 onChange={(e) => setAiQuestionCount(Number(e.target.value))}
                 className="w-full accent-purple-500"
@@ -374,7 +392,12 @@ export default function HostCreate() {
                 <input
                   type="checkbox"
                   checked={aiDynamicMode}
-                  onChange={(e) => setAiDynamicMode(e.target.checked)}
+                  onChange={(e) => {
+                    aiDynamicModeRef.current = e.target.checked
+                    setAiDynamicMode(e.target.checked)
+                    setDynamicToggleGuard(true)
+                    setTimeout(() => setDynamicToggleGuard(false), 200)
+                  }}
                   className="w-5 h-5 mt-0.5 rounded accent-purple-500"
                 />
                 <div>
@@ -387,7 +410,7 @@ export default function HostCreate() {
             {/* Generate Button */}
             <button
               onClick={handleAiGenerate}
-              disabled={aiGenerating || !aiTopics.trim()}
+              disabled={aiGenerating || !aiTopics.trim() || dynamicToggleGuard}
               className="w-full py-3 px-6 font-bold rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {aiGenerating ? (
@@ -396,7 +419,7 @@ export default function HostCreate() {
                 </>
               ) : (
                 <>
-                  <span>✨</span> Generate Quiz
+                  <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
                 </>
               )}
             </button>

@@ -1,4 +1,4 @@
-import { Question, LiveLeaderboardEntry, QuestionStats, AnswerStatusWithNames } from '../types'
+import { Question, LiveLeaderboardEntry, QuestionStats, AnswerStatusWithNames, PerformanceData } from '../types'
 
 interface CreateSessionRequest {
   timerMode?: boolean
@@ -45,13 +45,6 @@ interface GenerateQuestionsResponse {
   questions: Question[]
   topics_clarified?: string
   generation_time_ms: number
-}
-
-interface PerformanceData {
-  avg_score_percent: number
-  avg_response_time_ms: number
-  player_count: number
-  questions_answered: number
 }
 
 interface GenerateDynamicBatchRequest {
@@ -154,10 +147,10 @@ export class ApiClient {
     })
   }
 
-  async submitAnswer(code: string, playerId: string, questionIndex: number, choice: number): Promise<void> {
+  async submitAnswer(code: string, playerId: string, questionIndex: number, choice: number, responseTimeMs?: number): Promise<void> {
     return this.request(`/api/session/${code}/answer`, {
       method: 'POST',
-      body: JSON.stringify({ playerId, questionIndex, choice }),
+      body: JSON.stringify({ playerId, questionIndex, choice, response_time_ms: responseTimeMs ?? null }),
     })
   }
 
@@ -171,6 +164,21 @@ export class ApiClient {
 
   async getAnswerStatus(code: string, hostToken: string): Promise<AnswerStatusWithNames> {
     return this.request(`/api/session/${code}/answer-status`, {
+      headers: { 'X-Host-Token': hostToken },
+    })
+  }
+
+  async appendQuestions(code: string, hostToken: string, questions: Question[]): Promise<{ ok: boolean; previousCount: number; newCount: number; appended: number }> {
+    return this.request(`/api/session/${code}/append-questions`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify({ questions }),
+    })
+  }
+
+  async getPerformance(code: string, hostToken: string, lastN?: number): Promise<PerformanceData> {
+    const params = lastN ? `?last_n=${lastN}` : ''
+    return this.request(`/api/session/${code}/performance${params}`, {
       headers: { 'X-Host-Token': hostToken },
     })
   }

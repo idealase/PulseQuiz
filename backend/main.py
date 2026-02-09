@@ -117,6 +117,7 @@ class AnswerRequest(BaseModel):
     playerId: str
     questionIndex: int
     choice: int
+    response_time_ms: Optional[int] = None  # Client-measured response time in milliseconds
 
 
 class ObserveResponse(BaseModel):
@@ -127,7 +128,7 @@ class ObserveResponse(BaseModel):
 
 class GenerateQuestionsRequest(BaseModel):
     topics: str = Field(description="Comma-separated list of topics")
-    count: int = Field(default=10, ge=3, le=30, description="Number of questions to generate")
+    count: int = Field(default=10, ge=3, le=50, description="Number of questions to generate")
     research_mode: bool = Field(default=False, description="Enable deeper research (uses more AI)")
     difficulty: str = Field(default="mixed", description="easy, medium, hard, or mixed")
 
@@ -151,7 +152,7 @@ class GenerateDynamicBatchRequest(BaseModel):
     batch_number: int
     performance: Optional[PerformanceData] = None
     previous_difficulty: str = "medium"
-    batch_size: int = Field(default=5, ge=3, le=10)
+    batch_size: int = Field(default=10, ge=10, le=10)
 
 
 class GenerateDynamicBatchResponse(BaseModel):
@@ -263,6 +264,28 @@ def find_copilot_cli() -> Optional[str]:
     if cli_path and os.path.exists(cli_path):
         return cli_path
     
+    # Check for bundled CLI from github-copilot-sdk package
+    if COPILOT_SDK_AVAILABLE:
+        try:
+            import copilot
+            sdk_cli_path = Path(copilot.__file__).parent / "bin" / "copilot"
+            if sdk_cli_path.exists():
+                # Ensure it's executable
+                if not os.access(sdk_cli_path, os.X_OK):
+                    try:
+                        os.chmod(sdk_cli_path, 0o755)
+                        logger.info(f"✓ Made SDK CLI executable: {sdk_cli_path}")
+                    except Exception as e:
+                        logger.warning(f"⚠️  Could not make SDK CLI executable: {e}")
+                
+                # Only return if executable
+                if os.access(sdk_cli_path, os.X_OK):
+                    return str(sdk_cli_path)
+                else:
+                    logger.warning(f"⚠️  SDK CLI at {sdk_cli_path} is not executable; skipping this path")
+        except Exception as e:
+            logger.debug(f"Could not find SDK bundled CLI: {e}")
+    
     # Known Windows locations - prefer the actual exe
     possible_paths = [
         r"C:\Users\brodi\AppData\Local\Microsoft\WinGet\Packages\GitHub.Copilot_Microsoft.Winget.Source_8wekyb3d8bbwe\copilot.exe",
@@ -290,6 +313,16 @@ async def generate_with_copilot(
     caller: str = "generate_with_copilot",
 ) -> str:
     """Generate content using Copilot CLI directly (non-interactive mode)"""
+    
+    # Validate model name (basic sanity check)
+    valid_models = [
+        "claude-sonnet-4.5", "claude-haiku-4.5", "claude-opus-4.5", "claude-sonnet-4",
+        "gemini-3-pro-preview", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1-codex-max",
+        "gpt-5.1-codex", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1"
+    ]
+    if model not in valid_models:
+        copilot_log.warning("Unrecognized model: %s, using default gpt-4.1", model)
+        model = "gpt-4.1"
 
     # Build the full prompt with system message
     full_prompt = f"""{system_message}
@@ -313,9 +346,11 @@ USER REQUEST:
         tracker.finish(success=False, error="Copilot CLI not found")
         raise HTTPException(
             status_code=503,
-            detail="Copilot CLI not found. Install with: winget install GitHub.Copilot"
+            detail=(
+                "Copilot CLI not found. Install github-copilot-sdk (pip install github-copilot-sdk) "
+                "or GitHub.Copilot (winget install GitHub.Copilot)."
+            )
         )
-
     copilot_log.info("CLI Path: %s", cli_path)
     copilot_log.info("Model: %s  |  Prompt chars: %d", model, len(full_prompt))
 
@@ -350,6 +385,21 @@ USER REQUEST:
             copilot_log.debug("stderr output:\n%s", stderr_text)
 
         if process.returncode != 0:
+            # Check for authentication errors
+            if "No authentication information found" in stderr_text or "authentication" in stderr_text.lower():
+                err_msg = "Copilot authentication required. Set GITHUB_TOKEN, GH_TOKEN, or COPILOT_GITHUB_TOKEN environment variable."
+                tracker.finish(
+                    success=False,
+                    error=err_msg,
+                    exit_code=process.returncode,
+                    stderr_text=stderr_text,
+                    stdout_text=stdout_text,
+                    response_chars=len(stdout_text),
+                )
+                raise HTTPException(
+                    status_code=401,
+                    detail=err_msg + " Or run 'copilot' and use the '/login' command."
+                )
             err_msg = f"Copilot CLI exit code {process.returncode}: {stderr_text[:200]}"
             tracker.finish(
                 success=False,
@@ -685,6 +735,131 @@ async def upload_questions(
     return {"ok": True, "count": len(request.questions)}
 
 
+@app.post("/api/session/{code}/append-questions")
+async def append_questions(
+    code: str,
+    request: UploadQuestionsRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Append questions to a session mid-game (host only). Enables dynamic batching."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+    
+    if session.status not in ('lobby', 'playing'):
+        raise HTTPException(status_code=400, detail="Cannot append questions after reveal")
+    
+    if not request.questions:
+        raise HTTPException(status_code=400, detail="No questions provided")
+    
+    # Append to existing questions instead of replacing
+    previous_count = len(session.questions)
+    session.questions.extend(request.questions)
+    new_count = len(session.questions)
+    
+    logger.info(f"📝 Appended {len(request.questions)} questions to session {code} ({previous_count} -> {new_count})")
+    
+    # Broadcast questions_updated event to all clients
+    await broadcast_to_session(code, {
+        'type': 'questions_updated',
+        'totalQuestions': new_count,
+        'addedCount': len(request.questions)
+    })
+    
+    # Also send updated session state so clients have the new question list
+    await broadcast_to_session(code, {
+        'type': 'session_state',
+        'state': session.to_state().model_dump()
+    })
+    
+    return {"ok": True, "previousCount": previous_count, "newCount": new_count, "appended": len(request.questions)}
+
+
+@app.get("/api/session/{code}/performance")
+async def get_performance(
+    code: str,
+    x_host_token: str = Header(alias="X-Host-Token"),
+    last_n: int = 5
+):
+    """Get performance metrics for the session (host only). Used for adaptive difficulty."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session = sessions[code]
+    
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+    
+    players = list(session.players.values())
+    if not players:
+        return {
+            "avg_score_percent": 0.0,
+            "avg_response_time_ms": 0,
+            "player_count": 0,
+            "questions_answered": 0,
+            "per_question": []
+        }
+    
+    # Determine question range to analyze (last N questions up to current)
+    current_idx = session.current_question_index
+    start_idx = max(0, current_idx - last_n + 1)
+    question_range = range(start_idx, current_idx + 1)
+    
+    total_correct = 0
+    total_attempts = 0
+    total_response_time_ms = 0
+    response_time_count = 0
+    
+    per_question_stats = []
+    
+    for q_idx in question_range:
+        if q_idx >= len(session.questions):
+            continue
+        question = session.questions[q_idx]
+        q_correct = 0
+        q_attempts = 0
+        q_total_time_ms = 0
+        q_time_count = 0
+        
+        for player in players:
+            if q_idx in player.answers:
+                q_attempts += 1
+                total_attempts += 1
+                if player.answers[q_idx] == question.correct:
+                    q_correct += 1
+                    total_correct += 1
+                
+                if q_idx in player.answer_times:
+                    time_ms = int(player.answer_times[q_idx] * 1000)
+                    q_total_time_ms += time_ms
+                    q_time_count += 1
+                    total_response_time_ms += time_ms
+                    response_time_count += 1
+        
+        per_question_stats.append({
+            "questionIndex": q_idx,
+            "correct": q_correct,
+            "attempts": q_attempts,
+            "score_percent": round((q_correct / q_attempts * 100), 1) if q_attempts > 0 else 0.0,
+            "avg_response_time_ms": int(q_total_time_ms / q_time_count) if q_time_count > 0 else 0
+        })
+    
+    avg_score_percent = round((total_correct / total_attempts * 100), 1) if total_attempts > 0 else 0.0
+    avg_response_time_ms = int(total_response_time_ms / response_time_count) if response_time_count > 0 else 0
+    
+    return {
+        "avg_score_percent": avg_score_percent,
+        "avg_response_time_ms": avg_response_time_ms,
+        "player_count": len(players),
+        "questions_answered": total_attempts,
+        "per_question": per_question_stats
+    }
+
+
 @app.post("/api/session/{code}/start")
 async def start_round(code: str, x_host_token: str = Header(alias="X-Host-Token")):
     """Start the quiz round (host only)"""
@@ -811,9 +986,12 @@ async def submit_answer(code: str, request: AnswerRequest):
     
     player.answers[request.questionIndex] = request.choice
     
-    # Record answer time
-    start_time = session.question_start_times.get(request.questionIndex, time.time())
-    player.answer_times[request.questionIndex] = time.time() - start_time
+    # Record answer time - prefer client-measured time, fall back to server-side calculation
+    if request.response_time_ms is not None and request.response_time_ms >= 0:
+        player.answer_times[request.questionIndex] = request.response_time_ms / 1000.0
+    else:
+        start_time = session.question_start_times.get(request.questionIndex, time.time())
+        player.answer_times[request.questionIndex] = time.time() - start_time
     
     # Get answer status (who has/hasn't answered)
     answer_status = session.get_answer_status(request.questionIndex)
@@ -1174,7 +1352,14 @@ async def generate_questions(
     if not verify_auth_token(x_auth_token):
         raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
     
-    logger.info(f"🎯 Generate request: topics='{request.topics}', count={request.count}, research={request.research_mode}")
+    # Validate topics input
+    topics = request.topics.strip()
+    if not topics:
+        raise HTTPException(status_code=400, detail="Topics cannot be empty")
+    if len(topics) > 500:
+        raise HTTPException(status_code=400, detail="Topics too long (max 500 characters)")
+    
+    logger.info(f"🎯 Generate request: topics='{topics}', count={request.count}, research={request.research_mode}")
     start_time = time.time()
     
     # Build the prompt
@@ -1186,7 +1371,7 @@ async def generate_questions(
     if request.research_mode:
         research_instruction = "\nPlease research these topics thoroughly before generating questions. Include interesting and lesser-known facts."
     
-    prompt = f"""Generate {request.count} multiple-choice quiz questions about the following topics: {request.topics}
+    prompt = f"""Generate {request.count} multiple-choice quiz questions about the following topics: {topics}
 {difficulty_instruction}{research_instruction}
 
 Remember to output ONLY valid JSON with the questions array."""
@@ -1332,24 +1517,57 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
             caller="fact_check",
         )
         
-        # Parse the response
+        # Parse the response - try to extract JSON
+        # First try to find JSON in markdown code blocks
+        json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+        if json_match:
+            content = json_match.group(1).strip()
+        
+        # Then try to find JSON object
         json_match = re.search(r'\{[\s\S]*\}', content)
         if json_match:
-            data = json.loads(json_match.group())
+            try:
+                data = json.loads(json_match.group())
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ Failed to parse JSON from fact-check response: {e}")
+                logger.error(f"   Content: {content[:200]}...")
+                raise ValueError(f"Invalid JSON in response: {e}")
             
-            logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={data.get('confidence')}")
+            # Validate and clamp confidence value
+            confidence = data.get('confidence', 0.5)
+            try:
+                confidence = float(confidence)
+                confidence = max(0.0, min(1.0, confidence))  # Clamp to [0.0, 1.0]
+            except (ValueError, TypeError):
+                logger.warning(f"⚠️  Invalid confidence value: {confidence}, defaulting to 0.5")
+                confidence = 0.5
+            
+            logger.info(f"🔍 Fact-check result: verified={data.get('verified')}, confidence={confidence}")
+            
+            # Parse verified value - handle string/bool variations
+            verified_value = data.get('verified', False)
+            if isinstance(verified_value, str):
+                verified = verified_value.lower() in ('true', '1', 'yes')
+            else:
+                verified = bool(verified_value)
             
             return FactCheckResponse(
-                verified=data.get('verified', False),
-                confidence=float(data.get('confidence', 0.5)),
-                explanation=data.get('explanation', 'Unable to verify'),
-                source_hint=data.get('source_hint')
+                verified=verified,
+                confidence=confidence,
+                explanation=str(data.get('explanation', 'Unable to verify')),
+                source_hint=str(data.get('source_hint')) if data.get('source_hint') else None
             )
         else:
+            logger.error(f"❌ No JSON found in fact-check response")
+            logger.error(f"   Content: {content[:200]}...")
             raise ValueError("No JSON found in response")
             
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"❌ Fact-check failed: {e}")
+        logger.error(f"   Exception type: {type(e).__name__}")
         raise HTTPException(status_code=500, detail=f"Fact-check failed: {str(e)}")
 
 

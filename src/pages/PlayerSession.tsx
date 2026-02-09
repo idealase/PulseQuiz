@@ -22,6 +22,9 @@ export default function PlayerSession() {
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
   const [myRank, setMyRank] = useState<number | null>(null)
   
+  // Track when question was shown for response time measurement
+  const questionShownAtRef = useRef<number>(Date.now())
+  
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
@@ -49,6 +52,8 @@ export default function PlayerSession() {
           // Reset answer state for new question
           setSelectedAnswer(null)
           setAnswerLocked(false)
+          // Record when this question was shown
+          questionShownAtRef.current = Date.now()
           break
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
@@ -85,8 +90,9 @@ export default function PlayerSession() {
     const handleAutoSubmit = async () => {
       if (selectedAnswer === null || !code || !playerId || !session) return
       setAnswerLocked(true)
+      const responseTimeMs = Date.now() - questionShownAtRef.current
       try {
-        await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+        await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer, responseTimeMs)
       } catch {
         // Silent fail on auto-submit
       }
@@ -119,8 +125,9 @@ export default function PlayerSession() {
     if (selectedAnswer === null || !code || !playerId || !session) return
     
     setAnswerLocked(true)
+    const responseTimeMs = Date.now() - questionShownAtRef.current
     try {
-      await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer)
+      await api.submitAnswer(code, playerId, session.currentQuestionIndex, selectedAnswer, responseTimeMs)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to submit answer')
       setAnswerLocked(false)
@@ -234,7 +241,7 @@ export default function PlayerSession() {
           </div>
 
           {/* Options */}
-          <div className="flex-1 grid grid-cols-1 gap-2 min-h-0 auto-rows-fr">
+          <div className="flex-1 grid grid-cols-1 gap-1 min-h-0 auto-rows-min">
             {currentQuestion.options.map((opt, i) => {
               const timerExpired = session.settings?.timerMode && timerRemaining === 0
               const isDisabled = answerLocked || timerExpired
@@ -244,7 +251,7 @@ export default function PlayerSession() {
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium transition-all active:scale-98 flex items-center ${
+                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium leading-tight transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
                         ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
@@ -255,7 +262,7 @@ export default function PlayerSession() {
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
-                  <span className="line-clamp-2">{opt}</span>
+                  <span className="line-clamp-1 md:line-clamp-2">{opt}</span>
                 </button>
               )
             })}

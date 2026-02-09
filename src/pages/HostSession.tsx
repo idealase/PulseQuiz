@@ -36,9 +36,36 @@ export default function HostSession() {
   const [factCheckResults, setFactCheckResults] = useState<Record<number, FactCheckResult>>({})
   const [factCheckLoading, setFactCheckLoading] = useState<number | null>(null)
   
+  // Dynamic mode state
+  const [dynamicConfig, setDynamicConfig] = useState<{
+    enabled: boolean
+    topics: string
+    authToken: string
+    targetCount: number
+    batchSize: number
+    currentBatch: number
+    lastDifficulty: string
+  } | null>(null)
+  const [generatingBatch, setGeneratingBatch] = useState(false)
+  
   const hostToken = sessionStorage.getItem(`host_${code}`)
   const authToken = localStorage.getItem('quiz_auth_token') || ''
   const api = new ApiClient(config.apiBaseUrl)
+
+  // Load dynamic mode config on mount
+  useEffect(() => {
+    if (code) {
+      const configJson = sessionStorage.getItem(`dynamic_${code}`)
+      if (configJson) {
+        try {
+          const config = JSON.parse(configJson)
+          setDynamicConfig(config)
+        } catch (e) {
+          console.error('Failed to parse dynamic config:', e)
+        }
+      }
+    }
+  }, [code])
 
   useEffect(() => {
     if (!code || !hostToken) {
@@ -108,6 +135,10 @@ export default function HostSession() {
         case 'question_stats':
           setQuestionStats(msg.stats)
           break
+        case 'questions_updated':
+          // Questions were appended mid-session; session_state will follow
+          console.log(`📝 Questions updated: +${msg.addedCount} (total: ${msg.totalQuestions})`)
+          break
         case 'error':
           setError(msg.message)
           break
@@ -143,6 +174,27 @@ export default function HostSession() {
 
   const handleNext = async () => {
     if (!code || !hostToken) return
+    
+    // Check if we need to generate next batch in dynamic mode
+    if (dynamicConfig && session) {
+      const currentQuestionIndex = session.currentQuestionIndex
+      const totalQuestions = session.questions.length
+      const questionsRemaining = totalQuestions - currentQuestionIndex - 1
+      const isAtLastLoadedQuestion = currentQuestionIndex >= totalQuestions - 1
+      const needsMoreQuestions = totalQuestions < dynamicConfig.targetCount
+      
+      // Generate next batch when we have 5 or fewer questions remaining
+      // and haven't reached target count
+      if (!generatingBatch && questionsRemaining <= 5 && needsMoreQuestions) {
+        void generateNextBatch()
+      }
+
+      // If we're at the last loaded question but need more, wait for batch
+      if (isAtLastLoadedQuestion && needsMoreQuestions) {
+        return
+      }
+    }
+    
     setLoading(true)
     try {
       await api.nextQuestion(code, hostToken)
@@ -150,6 +202,65 @@ export default function HostSession() {
       setError(e instanceof Error ? e.message : 'Failed to advance')
     }
     setLoading(false)
+  }
+  
+  const generateNextBatch = async () => {
+    if (!code || !hostToken || !session || !dynamicConfig) return
+    
+    setGeneratingBatch(true)
+    try {
+      // Fetch real performance metrics from the backend
+      let performanceData
+      try {
+        performanceData = await api.getPerformance(code, hostToken, dynamicConfig.batchSize)
+      } catch (perfErr) {
+        console.warn('⚠️  Could not fetch performance data, using defaults:', perfErr)
+        performanceData = {
+          avg_score_percent: 60,
+          avg_response_time_ms: 8000,
+          player_count: session.players.length,
+          questions_answered: Math.min(session.currentQuestionIndex + 1, 5)
+        }
+      }
+      
+      const nextBatchNumber = dynamicConfig.currentBatch + 1
+      const questionsToGenerate = Math.min(
+        dynamicConfig.batchSize,
+        dynamicConfig.targetCount - session.questions.length
+      )
+      
+      console.log(`🎲 Generating batch #${nextBatchNumber}: ${questionsToGenerate} questions (performance: ${performanceData.avg_score_percent}% correct, ${performanceData.avg_response_time_ms}ms avg)`)
+      
+      const result = await api.generateDynamicBatch({
+        topics: dynamicConfig.topics,
+        session_code: code,
+        batch_number: nextBatchNumber,
+        batch_size: questionsToGenerate,
+        previous_difficulty: dynamicConfig.lastDifficulty || 'medium',
+        performance: performanceData
+      }, dynamicConfig.authToken)
+      
+      // Append questions mid-session using the new endpoint
+      if (result.questions.length > 0) {
+        await api.appendQuestions(code, hostToken, result.questions)
+        
+        // Update dynamic config with last difficulty for next batch
+        const updatedConfig = { 
+          ...dynamicConfig, 
+          currentBatch: nextBatchNumber,
+          lastDifficulty: result.suggested_difficulty 
+        }
+        setDynamicConfig(updatedConfig)
+        sessionStorage.setItem(`dynamic_${code}`, JSON.stringify(updatedConfig))
+        
+        console.log(`✅ Appended ${result.questions.length} new questions (${result.suggested_difficulty} difficulty)`)
+      }
+    } catch (e) {
+      console.error('Failed to generate next batch:', e)
+      const errorMsg = e instanceof Error ? e.message : 'Failed to generate next batch'
+      setError(errorMsg)
+    }
+    setGeneratingBatch(false)
   }
 
   const handleReveal = async () => {
@@ -219,6 +330,14 @@ export default function HostSession() {
       {connectionMode === 'polling' && (
         <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
           📡 Using polling mode (corporate network detected)
+        </div>
+      )}
+      
+      {/* Dynamic mode indicator */}
+      {dynamicConfig && (
+        <div className="mb-4 p-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-300 text-sm text-center">
+          🎲 Dynamic Mode: {session.questions.length}/{dynamicConfig.targetCount} questions
+          {generatingBatch && <span className="ml-2 animate-pulse">• Generating next batch...</span>}
         </div>
       )}
 
