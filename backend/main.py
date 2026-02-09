@@ -24,6 +24,7 @@ from models import (
 from logger import (
     setup_logging, get_logger, get_copilot_logger,
     CopilotCallTracker, summarize_token_usage,
+    log_game_event, set_request_id,
 )
 
 # Initialise structured, file-based logging
@@ -589,6 +590,8 @@ async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[st
     # Clean up dead connections
     for conn_id in dead_connections:
         del ws_connections[code][conn_id]
+    if dead_connections:
+        logger.debug(f"🧹 Cleaned {len(dead_connections)} dead connection(s) in session {code}")
 
 
 # --- REST Endpoints ---
@@ -611,7 +614,15 @@ async def create_session(request: CreateSessionRequest = CreateSessionRequest())
         auto_progress_percent=max(50, min(100, request.autoProgressPercent))  # Clamp between 50-100%
     )
     ws_connections[code] = {}
-    
+
+    logger.info(f"🆕 Session created: {code} (timer={request.timerMode}, autoProgress={request.autoProgressMode})")
+    log_game_event("session_created", session_code=code, data={
+        "timer_mode": request.timerMode,
+        "timer_seconds": request.timerSeconds,
+        "auto_progress_mode": request.autoProgressMode,
+        "auto_progress_percent": request.autoProgressPercent,
+    })
+
     return CreateSessionResponse(code=code, hostToken=host_token)
 
 
@@ -634,7 +645,13 @@ async def join_session(code: str, request: JoinRequest):
     player_id = generate_player_id()
     player = Player(id=player_id, nickname=request.nickname)
     session.players[player_id] = player
-    
+
+    logger.info(f"👤 Player joined: {request.nickname} -> session {code} (total={len(session.players)})")
+    log_game_event("player_joined", session_code=code, player_id=player_id, data={
+        "nickname": request.nickname,
+        "player_count": len(session.players),
+    })
+
     # Notify all connections
     await broadcast_to_session(code, {
         'type': 'player_joined',
@@ -653,7 +670,10 @@ async def observe_session(code: str):
     observer_id = generate_player_id()
     session = sessions[code]
     session.observers[observer_id] = observer_id
-    
+
+    logger.debug(f"👁️ Observer joined session {code} (total observers={len(session.observers)})")
+    log_game_event("observer_joined", session_code=code, data={"observer_count": len(session.observers)})
+
     return ObserveResponse(observerId=observer_id)
 
 
@@ -732,6 +752,10 @@ async def upload_questions(
         raise HTTPException(status_code=400, detail="Cannot modify questions after start")
     
     session.questions = request.questions
+
+    logger.info(f"📤 Questions uploaded to session {code}: {len(request.questions)} questions")
+    log_game_event("questions_uploaded", session_code=code, data={"count": len(request.questions)})
+
     return {"ok": True, "count": len(request.questions)}
 
 
@@ -877,7 +901,14 @@ async def start_round(code: str, x_host_token: str = Header(alias="X-Host-Token"
     session.status = 'playing'
     session.current_question_index = 0
     session.question_start_times[0] = time.time()  # Record start time
-    
+
+    logger.info(f"🚀 Round started: session {code}, {len(session.questions)} questions, {len(session.players)} players")
+    log_game_event("round_started", session_code=code, data={
+        "question_count": len(session.questions),
+        "player_count": len(session.players),
+        "timer_mode": session.timer_mode,
+    })
+
     # Broadcast to all
     await broadcast_to_session(code, {
         'type': 'question_started',
@@ -920,7 +951,13 @@ async def next_question(code: str, x_host_token: str = Header(alias="X-Host-Toke
     
     session.current_question_index += 1
     session.question_start_times[session.current_question_index] = time.time()  # Record start time
-    
+
+    logger.info(f"⏭️ Next question: session {code}, Q{session.current_question_index + 1}/{len(session.questions)}")
+    log_game_event("next_question", session_code=code, data={
+        "question_index": session.current_question_index,
+        "total_questions": len(session.questions),
+    })
+
     await broadcast_to_session(code, {
         'type': 'question_started',
         'questionIndex': session.current_question_index
@@ -950,7 +987,13 @@ async def reveal_results(code: str, x_host_token: str = Header(alias="X-Host-Tok
     
     session.status = 'revealed'
     session.calculate_scores()
-    
+
+    logger.info(f"🏁 Round revealed: session {code}, {len(session.players)} players")
+    log_game_event("round_revealed", session_code=code, data={
+        "player_count": len(session.players),
+        "question_count": len(session.questions),
+    })
+
     # Broadcast reveal - personalization happens in broadcast_to_session
     results = session.get_reveal_results()
     await broadcast_to_session(code, {
@@ -985,7 +1028,15 @@ async def submit_answer(code: str, request: AnswerRequest):
         raise HTTPException(status_code=400, detail="Already answered")
     
     player.answers[request.questionIndex] = request.choice
-    
+
+    is_correct = request.choice == session.questions[request.questionIndex].correct
+    log_game_event("answer_submitted", session_code=code, player_id=request.playerId, data={
+        "question_index": request.questionIndex,
+        "choice": request.choice,
+        "correct": is_correct,
+        "response_time_ms": request.response_time_ms,
+    })
+
     # Record answer time - prefer client-measured time, fall back to server-side calculation
     if request.response_time_ms is not None and request.response_time_ms >= 0:
         player.answer_times[request.questionIndex] = request.response_time_ms / 1000.0
@@ -1093,6 +1144,8 @@ async def websocket_session(websocket: WebSocket, code: str):
         
         # Register connection
         ws_connections[code][conn_id] = (websocket, role, identifier)
+        logger.info(f"🔌 WebSocket connected: role={role}, session={code}")
+        log_game_event("ws_connected", session_code=code, data={"role": role, "conn_id": conn_id})
         
         # Send current session state
         session = sessions[code]
@@ -1123,12 +1176,14 @@ async def websocket_session(websocket: WebSocket, code: str):
     except WebSocketDisconnect:
         pass
     except Exception as e:
-        print(f"WebSocket error: {e}")
+        logger.error(f"🔌 WebSocket error for session {code}: {e}", exc_info=True)
     finally:
         # Clean up connection
         if code in ws_connections and conn_id in ws_connections[code]:
             del ws_connections[code][conn_id]
-            
+            logger.info(f"🔌 WebSocket disconnected: role={role}, session={code}")
+            log_game_event("ws_disconnected", session_code=code, data={"role": role, "conn_id": conn_id})
+
             # Notify others if a player left
             if role == 'player' and identifier:
                 await broadcast_to_session(code, {

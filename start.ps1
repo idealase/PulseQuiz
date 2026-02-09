@@ -6,6 +6,7 @@ param(
     [switch]$SkipDeploy,      # Skip GitHub Pages deploy (ngrok mode only)
     [switch]$SkipBuild,       # Skip frontend build
     [switch]$CleanRefresh,    # Force clean refresh of frontend/backend dependencies
+    [switch]$VerboseLogging,  # Enable verbose backend + access logs
     [int]$Port = 8000,
     [string]$Message = ""     # Custom message to display on home page
 )
@@ -41,6 +42,10 @@ if ($UseNgrok) {
     Write-Host "📡 Mode: ngrok + GitHub Pages" -ForegroundColor Yellow
 } else {
     Write-Host "📡 Mode: Cloudflare Tunnel (corporate-friendly)" -ForegroundColor Green
+}
+
+if ($VerboseLogging) {
+    Write-Host "🗣️  Verbose logging: ENABLED" -ForegroundColor Magenta
 }
 
 # --- Environment Diagnostics ---
@@ -234,8 +239,11 @@ $authSecret = $env:QUIZ_AUTH_SECRET
 $githubToken = $env:GITHUB_TOKEN
 $ghToken = $env:GH_TOKEN
 
+$uvicornLogLevel = if ($VerboseLogging) { "debug" } else { "info" }
+$uvicornAccessLog = $VerboseLogging
+
 $backendJob = Start-Job -ScriptBlock {
-    param($path, $port, $authSecret, $githubToken, $ghToken)
+    param($path, $port, $authSecret, $githubToken, $ghToken, $logLevel, $accessLog)
     Set-Location $path
     
     # Set environment variables in the job
@@ -249,8 +257,19 @@ $backendJob = Start-Job -ScriptBlock {
         & $venvActivate
     }
     
-    python -m uvicorn main:app --host 0.0.0.0 --port $port
-} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken
+    $uvicornArgs = @(
+        "main:app",
+        "--host", "0.0.0.0",
+        "--port", $port,
+        "--log-level", $logLevel
+    )
+
+    if ($accessLog) {
+        $uvicornArgs += "--access-log"
+    }
+
+    python -m uvicorn @uvicornArgs
+} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken, $uvicornLogLevel, $uvicornAccessLog
 
 # Wait for backend to start
 Write-Host "⏳ Waiting for backend to initialize..." -ForegroundColor Gray

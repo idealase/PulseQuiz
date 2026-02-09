@@ -8,6 +8,7 @@ Log files produced:
   - pulsequiz.log          General backend log (all levels)
   - copilot.log            Copilot CLI / SDK call details (prompts, responses, timing)
   - token_usage.jsonl      One JSON object per Copilot call – easy to grep/parse for spend analysis
+  - game_events.jsonl      Structured game events (sessions, players, answers) for analytics
 """
 
 from __future__ import annotations
@@ -16,10 +17,29 @@ import json
 import logging
 import os
 import time
+import uuid
 from datetime import datetime, timezone
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any, Optional
+from contextvars import ContextVar
+
+# ---------------------------------------------------------------------------
+# Request / Correlation ID  (set per-request for traceability across logs)
+# ---------------------------------------------------------------------------
+
+_request_id: ContextVar[str] = ContextVar("request_id", default="-")
+
+
+def set_request_id(rid: str | None = None) -> str:
+    """Set a correlation ID for the current request context. Returns the ID."""
+    rid = rid or uuid.uuid4().hex[:12]
+    _request_id.set(rid)
+    return rid
+
+
+def get_request_id() -> str:
+    return _request_id.get("-")
 
 # ---------------------------------------------------------------------------
 # Directories
@@ -33,8 +53,9 @@ LOG_DIR.mkdir(exist_ok=True)
 # ---------------------------------------------------------------------------
 
 _VERBOSE_FMT = logging.Formatter(
-    fmt="%(asctime)s | %(levelname)-8s | %(name)-20s | %(message)s",
+    fmt="%(asctime)s | %(levelname)-8s | %(name)-20s | [%(request_id)s] %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
+    defaults={"request_id": "-"},
 )
 
 _CONSOLE_FMT = logging.Formatter(
@@ -69,6 +90,14 @@ def _rotating_handler(
 _CONFIGURED = False
 
 
+class _RequestIdFilter(logging.Filter):
+    """Inject the current request_id context var into every log record."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = get_request_id()  # type: ignore[attr-defined]
+        return True
+
+
 def setup_logging(*, console_level: int = logging.INFO) -> None:
     """Initialise all loggers.  Safe to call more than once."""
     global _CONFIGURED
@@ -76,9 +105,12 @@ def setup_logging(*, console_level: int = logging.INFO) -> None:
         return
     _CONFIGURED = True
 
+    rid_filter = _RequestIdFilter()
+
     # ---- Root / general logger ------------------------------------------
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
+    root.addFilter(rid_filter)
 
     # Console handler (keeps existing behaviour)
     console = logging.StreamHandler()
@@ -110,6 +142,19 @@ def setup_logging(*, console_level: int = logging.INFO) -> None:
     token_logger.addHandler(token_handler)
     token_logger.propagate = False  # don't echo raw JSON to console
 
+    # ---- Game-events logger (JSONL) – structured session/player events --
+    game_logger = logging.getLogger("game.events")
+    game_logger.setLevel(logging.DEBUG)
+    game_handler = _rotating_handler(
+        "game_events.jsonl",
+        max_bytes=10 * 1024 * 1024,
+        backup_count=10,
+        level=logging.DEBUG,
+    )
+    game_handler.setFormatter(logging.Formatter("%(message)s"))
+    game_logger.addHandler(game_handler)
+    game_logger.propagate = False
+
     logging.getLogger("PulseQuiz").info(
         f"📁 Logging initialised – log directory: {LOG_DIR.resolve()}"
     )
@@ -129,6 +174,40 @@ def get_copilot_logger() -> logging.Logger:
 
 def get_token_logger() -> logging.Logger:
     return logging.getLogger("copilot.tokens")
+
+
+def get_game_event_logger() -> logging.Logger:
+    return logging.getLogger("game.events")
+
+
+# ---------------------------------------------------------------------------
+# Structured game-event helper
+# ---------------------------------------------------------------------------
+
+def log_game_event(
+    event_type: str,
+    *,
+    session_code: str | None = None,
+    player_id: str | None = None,
+    data: dict[str, Any] | None = None,
+) -> None:
+    """Write a structured JSON line to game_events.jsonl.
+
+    Use for session lifecycle, player actions, WebSocket events, etc.
+    Each line is self-contained and easy to query with jq / pandas.
+    """
+    record = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event_type,
+        "request_id": get_request_id(),
+    }
+    if session_code:
+        record["session"] = session_code
+    if player_id:
+        record["player_id"] = player_id
+    if data:
+        record.update(data)
+    get_game_event_logger().info(json.dumps(record, default=str))
 
 
 # ---------------------------------------------------------------------------
@@ -182,6 +261,15 @@ class CopilotCallTracker:
         # The Copilot CLI sometimes emits usage on stderr or in the JSON
         # response body.  We try several heuristics.
         usage = token_usage or _extract_token_usage(stderr_text, stdout_text)
+
+        # If still only estimated / empty, fill in estimates from known char counts
+        if usage.get("estimated") or not usage:
+            prompt_est = self.prompt_chars // 4 if self.prompt_chars else 0
+            completion_est = response_chars // 4 if response_chars else 0
+            usage["estimated"] = True
+            usage["prompt_tokens_est"] = prompt_est
+            usage["completion_tokens_est"] = completion_est
+            usage["total_tokens_est"] = prompt_est + completion_est
 
         record: dict[str, Any] = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -296,13 +384,13 @@ def _extract_token_usage(stderr: str, stdout: str) -> dict[str, Any]:
     # Estimate tokens from char counts when no hard data available
     if not usage:
         # ~4 chars per token is a rough GPT-family heuristic
-        prompt_est = len(stderr) // 4 if stderr else 0
-        response_est = len(stdout) // 4 if stdout else 0
-        if prompt_est or response_est:
-            usage["estimated"] = True
-            usage["prompt_tokens_est"] = prompt_est
-            usage["completion_tokens_est"] = response_est
-            usage["total_tokens_est"] = prompt_est + response_est
+        # Note: caller should supply prompt_chars / response_chars via
+        # CopilotCallTracker; here we only have raw CLI output so the
+        # estimate is coarse.  We flag it as estimated.
+        usage["estimated"] = True
+        usage["prompt_tokens_est"] = 0
+        usage["completion_tokens_est"] = 0
+        usage["total_tokens_est"] = 0
 
     return usage
 
@@ -323,6 +411,9 @@ def summarize_token_usage(since_hours: float = 24) -> dict[str, Any]:
     total_completion = 0
     total_elapsed_ms = 0
     errors = 0
+    endpoint_counts: dict[str, int] = {}
+    slowest_call: dict[str, Any] | None = None
+    fastest_call: dict[str, Any] | None = None
 
     with open(jsonl_path, encoding="utf-8") as f:
         for line in f:
@@ -344,19 +435,35 @@ def summarize_token_usage(since_hours: float = 24) -> dict[str, Any]:
             usage = rec.get("token_usage") or {}
             total_prompt += usage.get("prompt_tokens", usage.get("prompt_tokens_est", 0))
             total_completion += usage.get("completion_tokens", usage.get("completion_tokens_est", 0))
-            total_elapsed_ms += rec.get("elapsed_ms", 0)
+            elapsed = rec.get("elapsed_ms", 0)
+            total_elapsed_ms += elapsed
             if not rec.get("success"):
                 errors += 1
 
+            # Per-endpoint breakdown
+            ep = rec.get("endpoint", "unknown")
+            endpoint_counts[ep] = endpoint_counts.get(ep, 0) + 1
+
+            # Track slowest / fastest
+            if slowest_call is None or elapsed > slowest_call.get("elapsed_ms", 0):
+                slowest_call = {"endpoint": ep, "elapsed_ms": elapsed, "timestamp": ts_str}
+            if fastest_call is None or elapsed < fastest_call.get("elapsed_ms", float("inf")):
+                fastest_call = {"endpoint": ep, "elapsed_ms": elapsed, "timestamp": ts_str}
+
+    avg_elapsed = total_elapsed_ms // max(len(calls), 1)
     return {
         "period_hours": since_hours,
         "total_calls": len(calls),
         "successful_calls": len(calls) - errors,
         "failed_calls": errors,
+        "error_rate_pct": round(errors / max(len(calls), 1) * 100, 1),
         "total_prompt_tokens": total_prompt,
         "total_completion_tokens": total_completion,
         "total_tokens": total_prompt + total_completion,
         "total_elapsed_ms": total_elapsed_ms,
-        "avg_elapsed_ms": total_elapsed_ms // max(len(calls), 1),
+        "avg_elapsed_ms": avg_elapsed,
+        "slowest_call": slowest_call,
+        "fastest_call": fastest_call,
+        "endpoint_breakdown": endpoint_counts,
         "models_used": list({c.get("model", "unknown") for c in calls}),
     }
