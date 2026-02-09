@@ -1,4 +1,15 @@
-import { Question, LiveLeaderboardEntry, QuestionStats, AnswerStatusWithNames, PerformanceData } from '../types'
+import {
+  Question,
+  LiveLeaderboardEntry,
+  QuestionStats,
+  AnswerStatusWithNames,
+  PerformanceData,
+  ChallengeSummary,
+  ChallengeDetail,
+  ChallengeResolution,
+  AIVerification,
+  ReconciliationPolicy
+} from '../types'
 
 interface CreateSessionRequest {
   timerMode?: boolean
@@ -173,6 +184,89 @@ export class ApiClient {
       method: 'POST',
       headers: { 'X-Host-Token': hostToken },
       body: JSON.stringify({ questions }),
+    })
+  }
+
+  async submitChallenge(
+    code: string,
+    playerId: string,
+    questionIndex: number,
+    note?: string,
+    category?: string,
+    source: 'review' | 'mid_game' = 'review'
+  ): Promise<void> {
+    return this.request(`/api/session/${code}/challenge`, {
+      method: 'POST',
+      body: JSON.stringify({ playerId, questionIndex, note, category, source })
+    })
+  }
+
+  async getMyChallenges(code: string, playerId: string): Promise<{ questionIndexes: number[] }> {
+    const params = new URLSearchParams({ player_id: playerId })
+    return this.request(`/api/session/${code}/challenges/mine?${params}`)
+  }
+
+  async getChallenges(code: string, hostToken: string): Promise<{ challenges: ChallengeSummary[] }> {
+    return this.request(`/api/session/${code}/challenges`, {
+      headers: { 'X-Host-Token': hostToken }
+    })
+  }
+
+  async getChallengeDetail(code: string, hostToken: string, questionIndex: number): Promise<ChallengeDetail> {
+    return this.request(`/api/session/${code}/challenges/${questionIndex}`, {
+      headers: { 'X-Host-Token': hostToken }
+    })
+  }
+
+  async resolveChallenge(
+    code: string,
+    hostToken: string,
+    questionIndex: number,
+    payload: { status: string; verdict?: string; resolutionNote?: string; publish?: boolean }
+  ): Promise<{ ok: boolean; resolution: ChallengeResolution }> {
+    return this.request(`/api/session/${code}/challenges/${questionIndex}/resolution`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify(payload)
+    })
+  }
+
+  async requestChallengeAIVerification(
+    code: string,
+    hostToken: string,
+    authToken: string,
+    questionIndex: number
+  ): Promise<{ ok: boolean; aiVerification: AIVerification }> {
+    return this.request(`/api/session/${code}/challenges/${questionIndex}/ai-verify`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken, 'X-Auth-Token': authToken },
+      body: JSON.stringify({ questionIndex })
+    })
+  }
+
+  async publishChallengeAIVerification(
+    code: string,
+    hostToken: string,
+    questionIndex: number,
+    publish = true
+  ): Promise<{ ok: boolean; aiVerification: AIVerification }> {
+    return this.request(`/api/session/${code}/challenges/${questionIndex}/ai-publish`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify({ publish })
+    })
+  }
+
+  async reconcileScores(
+    code: string,
+    hostToken: string,
+    questionIndex: number,
+    payload: { policy: string; acceptedAnswers?: number[]; note?: string }
+  ): Promise<{ ok: boolean; policy: ReconciliationPolicy; audit: { deltas: Record<string, number> } }> {
+    return this.request(`/api/session/${code}/challenges/${questionIndex}/reconcile`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify({ questionIndex, ...payload })
     })
   }
 

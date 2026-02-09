@@ -69,6 +69,11 @@ export type ServerMessage =
   | { type: 'leaderboard_update'; leaderboard: LiveLeaderboardEntry[] }
   | { type: 'question_stats'; stats: QuestionStats }
   | { type: 'questions_updated'; totalQuestions: number; addedCount: number }
+  | { type: 'challenge_updated'; questionIndex: number; count: number; status: string }
+  | { type: 'challenge_resolution'; questionIndex: number; resolution: ChallengeResolution }
+  | { type: 'challenge_ai_verified'; questionIndex: number; aiVerification: AIVerification }
+  | { type: 'challenge_ai_published'; questionIndex: number; aiVerification: AIVerification }
+  | { type: 'scores_reconciled'; questionIndex: number; policy: ReconciliationPolicy; deltas: Record<string, number> }
   | { type: 'error'; message: string }
 
 export interface RevealResults {
@@ -92,6 +97,72 @@ export interface QuestionResult {
   points: number
   yourAnswer?: number
   answeredCorrectly?: boolean
+  challengeStatus?: string
+  resolutionVerdict?: string
+  resolutionNote?: string
+  aiVerdict?: string
+  aiConfidence?: number
+  aiRationale?: string
+  aiSuggestedCorrection?: string
+  scoringPolicy?: string
+  acceptedAnswers?: number[]
+}
+
+export interface ChallengeSubmission {
+  playerId: string
+  nickname: string
+  questionIndex: number
+  category?: string
+  note?: string
+  source: string
+  createdAt: number
+}
+
+export interface ChallengeResolution {
+  status: string
+  verdict?: string
+  resolutionNote?: string
+  resolvedAt?: number
+  resolvedBy?: string
+  published: boolean
+}
+
+export interface AIVerification {
+  verdict: string
+  confidence: number
+  rationale: string
+  suggested_correction?: string
+  requestedAt: number
+  published: boolean
+  publishedAt?: number
+}
+
+export interface ReconciliationPolicy {
+  policy: string
+  acceptedAnswers?: number[]
+  appliedAt: number
+  appliedBy: string
+}
+
+export interface ChallengeSummary {
+  questionIndex: number
+  question: string
+  count: number
+  status: string
+  categories: Record<string, number>
+  lastUpdatedAt: number
+}
+
+export interface ChallengeDetail {
+  questionIndex: number
+  question: string
+  options: string[]
+  correct: number
+  explanation?: string
+  submissions: ChallengeSubmission[]
+  resolution?: ChallengeResolution | null
+  aiVerification?: AIVerification | null
+  reconciliation?: ReconciliationPolicy | null
 }
 
 export interface PerformanceData {

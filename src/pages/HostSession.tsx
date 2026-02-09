@@ -2,7 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
-import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
+import {
+  SessionState,
+  ServerMessage,
+  RevealResults,
+  LiveLeaderboardEntry,
+  QuestionStats,
+  ChallengeSummary,
+  ChallengeDetail
+} from '../types'
 
 interface FactCheckResult {
   verified: boolean
@@ -35,6 +43,23 @@ export default function HostSession() {
   // Fact-check state
   const [factCheckResults, setFactCheckResults] = useState<Record<number, FactCheckResult>>({})
   const [factCheckLoading, setFactCheckLoading] = useState<number | null>(null)
+
+  // Challenge state
+  const [challenges, setChallenges] = useState<ChallengeSummary[]>([])
+  const [challengeDetail, setChallengeDetail] = useState<ChallengeDetail | null>(null)
+  const [selectedChallengeIndex, setSelectedChallengeIndex] = useState<number | null>(null)
+  const [challengeLoading, setChallengeLoading] = useState(false)
+  const [challengeError, setChallengeError] = useState<string | null>(null)
+  const [resolutionDraft, setResolutionDraft] = useState({
+    status: 'open',
+    verdict: '',
+    note: '',
+    publish: false
+  })
+  const [aiVerificationLoading, setAiVerificationLoading] = useState(false)
+  const [publishAiLoading, setPublishAiLoading] = useState(false)
+  const [reconcilePolicy, setReconcilePolicy] = useState('void')
+  const [reconcileAnswers, setReconcileAnswers] = useState('')
   
   // Dynamic mode state
   const [dynamicConfig, setDynamicConfig] = useState<{
@@ -131,9 +156,52 @@ export default function HostSession() {
           break
         case 'leaderboard_update':
           setLeaderboard(msg.leaderboard)
+          setResults(prev => prev ? {
+            ...prev,
+            players: prev.players.map(p => {
+              const entry = msg.leaderboard.find(e => e.id === p.id)
+              return entry ? { ...p, score: entry.score, rank: entry.rank } : p
+            })
+          } : prev)
           break
         case 'question_stats':
           setQuestionStats(msg.stats)
+          break
+        case 'challenge_updated':
+          setChallenges(prev => {
+            const next = [...prev]
+            const idx = next.findIndex(c => c.questionIndex === msg.questionIndex)
+            const updated = {
+              questionIndex: msg.questionIndex,
+              question: idx >= 0 ? next[idx].question : `Question ${msg.questionIndex + 1}`,
+              count: msg.count,
+              status: msg.status,
+              categories: idx >= 0 ? next[idx].categories : {},
+              lastUpdatedAt: Date.now() / 1000
+            }
+            if (idx >= 0) {
+              next[idx] = { ...next[idx], ...updated }
+            } else {
+              next.push(updated)
+            }
+            return next
+          })
+          break
+        case 'challenge_resolution':
+          setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, resolution: msg.resolution }
+            : prev)
+          break
+        case 'challenge_ai_verified':
+        case 'challenge_ai_published':
+          setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, aiVerification: msg.aiVerification }
+            : prev)
+          break
+        case 'scores_reconciled':
+          setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, reconciliation: msg.policy }
+            : prev)
           break
         case 'questions_updated':
           // Questions were appended mid-session; session_state will follow
@@ -160,6 +228,12 @@ export default function HostSession() {
       connection.close()
     }
   }, [code, hostToken, config.apiBaseUrl])
+
+  useEffect(() => {
+    if (session?.status === 'revealed') {
+      loadChallenges()
+    }
+  }, [session?.status])
 
   const handleStart = async () => {
     if (!code || !hostToken) return
@@ -296,6 +370,113 @@ export default function HostSession() {
       setError(e instanceof Error ? e.message : 'Fact-check failed')
     }
     setFactCheckLoading(null)
+  }
+
+  const loadChallenges = async () => {
+    if (!code || !hostToken) return
+    setChallengeLoading(true)
+    setChallengeError(null)
+    try {
+      const response = await api.getChallenges(code, hostToken)
+      setChallenges(response.challenges)
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'Failed to load challenges')
+    }
+    setChallengeLoading(false)
+  }
+
+  const loadChallengeDetail = async (questionIndex: number) => {
+    if (!code || !hostToken) return
+    setSelectedChallengeIndex(questionIndex)
+    setChallengeLoading(true)
+    setChallengeError(null)
+    try {
+      const detail = await api.getChallengeDetail(code, hostToken, questionIndex)
+      setChallengeDetail(detail)
+      const resolution = detail.resolution
+      setResolutionDraft({
+        status: resolution?.status || 'open',
+        verdict: resolution?.verdict || '',
+        note: resolution?.resolutionNote || '',
+        publish: resolution?.published || false
+      })
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'Failed to load challenge detail')
+    }
+    setChallengeLoading(false)
+  }
+
+  const handleResolutionSave = async () => {
+    if (!code || !hostToken || selectedChallengeIndex === null) return
+    setChallengeLoading(true)
+    setChallengeError(null)
+    try {
+      const response = await api.resolveChallenge(code, hostToken, selectedChallengeIndex, {
+        status: resolutionDraft.status,
+        verdict: resolutionDraft.verdict || undefined,
+        resolutionNote: resolutionDraft.note || undefined,
+        publish: resolutionDraft.publish
+      })
+      setChallengeDetail(prev => prev ? { ...prev, resolution: response.resolution } : prev)
+      await loadChallenges()
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'Failed to update resolution')
+    }
+    setChallengeLoading(false)
+  }
+
+  const handleAIVerify = async () => {
+    if (!code || !hostToken || selectedChallengeIndex === null) return
+    if (!authToken) {
+      setChallengeError('No auth token - please set access code in Host Create page')
+      return
+    }
+    setAiVerificationLoading(true)
+    setChallengeError(null)
+    try {
+      const response = await api.requestChallengeAIVerification(code, hostToken, authToken, selectedChallengeIndex)
+      setChallengeDetail(prev => prev ? { ...prev, aiVerification: response.aiVerification } : prev)
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'AI verification failed')
+    }
+    setAiVerificationLoading(false)
+  }
+
+  const handlePublishAI = async () => {
+    if (!code || !hostToken || selectedChallengeIndex === null) return
+    setPublishAiLoading(true)
+    setChallengeError(null)
+    try {
+      const response = await api.publishChallengeAIVerification(code, hostToken, selectedChallengeIndex, true)
+      setChallengeDetail(prev => prev ? { ...prev, aiVerification: response.aiVerification } : prev)
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'Failed to publish AI verification')
+    }
+    setPublishAiLoading(false)
+  }
+
+  const handleReconcile = async () => {
+    if (!code || !hostToken || selectedChallengeIndex === null) return
+    setChallengeLoading(true)
+    setChallengeError(null)
+    try {
+      const acceptedAnswers = reconcilePolicy === 'accept_multiple'
+        ? reconcileAnswers
+            .split(',')
+            .map(value => Number(value.trim()))
+            .filter(value => Number.isFinite(value))
+        : undefined
+
+      const response = await api.reconcileScores(code, hostToken, selectedChallengeIndex, {
+        policy: reconcilePolicy,
+        acceptedAnswers
+      })
+      setChallengeDetail(prev => prev ? { ...prev, reconciliation: response.policy } : prev)
+      await loadChallenges()
+    } catch (e) {
+      setChallengeError(e instanceof Error ? e.message : 'Failed to reconcile scores')
+    }
+    setChallengeLoading(false)
   }
 
   if (!session) {
@@ -741,6 +922,231 @@ export default function HostSession() {
                 </div>
               </div>
             ))}
+          </div>
+
+          {/* Challenges Dashboard */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold">Challenges</h3>
+              <button
+                onClick={loadChallenges}
+                className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                Refresh
+              </button>
+            </div>
+
+            {challengeError && (
+              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-sm">
+                {challengeError}
+              </div>
+            )}
+
+            {challengeLoading && (
+              <div className="text-white/60 text-sm">Loading challenges...</div>
+            )}
+
+            {!challengeLoading && challenges.length === 0 && (
+              <div className="text-white/50 text-sm">No challenges yet.</div>
+            )}
+
+            <div className="space-y-2">
+              {challenges.map((challenge) => (
+                <button
+                  key={challenge.questionIndex}
+                  onClick={() => loadChallengeDetail(challenge.questionIndex)}
+                  className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                    challengeDetail?.questionIndex === challenge.questionIndex
+                      ? 'border-primary/60 bg-primary/10'
+                      : 'border-white/10 bg-white/5 hover:bg-white/10'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium truncate">
+                      Q{challenge.questionIndex + 1}. {challenge.question}
+                    </span>
+                    <span className="text-sm text-white/60">{challenge.count} challenge{challenge.count !== 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-white/50">
+                    Status: {challenge.status}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            {challengeDetail && (
+              <div className="bg-white/5 rounded-xl p-4 space-y-4">
+                <div>
+                  <h4 className="font-bold mb-1">
+                    Q{challengeDetail.questionIndex + 1}. {challengeDetail.question}
+                  </h4>
+                  <div className="space-y-1 text-sm">
+                    {challengeDetail.options.map((option, index) => (
+                      <div
+                        key={index}
+                        className={index === challengeDetail.correct ? 'text-green-400' : 'text-white/70'}
+                      >
+                        {String.fromCharCode(65 + index)}. {option}
+                        {index === challengeDetail.correct && ' ✓'}
+                      </div>
+                    ))}
+                  </div>
+                  {challengeDetail.explanation && (
+                    <p className="text-white/60 text-sm mt-2 italic">💡 {challengeDetail.explanation}</p>
+                  )}
+                </div>
+
+                <div>
+                  <h5 className="font-semibold mb-2">Submissions</h5>
+                  <div className="space-y-2">
+                    {challengeDetail.submissions.length === 0 ? (
+                      <p className="text-white/50 text-sm">No submissions yet.</p>
+                    ) : (
+                      challengeDetail.submissions.map((submission, idx) => (
+                        <div key={idx} className="p-2 rounded-lg bg-white/5 text-sm">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">{submission.nickname}</span>
+                            <span className="text-white/40 text-xs">{submission.source}</span>
+                          </div>
+                          {submission.category && (
+                            <div className="text-white/60 text-xs">Category: {submission.category}</div>
+                          )}
+                          {submission.note && (
+                            <div className="text-white/70 mt-1">{submission.note}</div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-semibold">Resolution</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <label className="text-xs text-white/60">Status
+                      <select
+                        value={resolutionDraft.status}
+                        onChange={(e) => setResolutionDraft(prev => ({ ...prev, status: e.target.value }))}
+                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                      >
+                        <option value="open">Open</option>
+                        <option value="under_review">Under Review</option>
+                        <option value="resolved">Resolved</option>
+                      </select>
+                    </label>
+                    <label className="text-xs text-white/60">Verdict
+                      <select
+                        value={resolutionDraft.verdict}
+                        onChange={(e) => setResolutionDraft(prev => ({ ...prev, verdict: e.target.value }))}
+                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                      >
+                        <option value="">Select</option>
+                        <option value="valid">Valid</option>
+                        <option value="invalid">Invalid</option>
+                        <option value="ambiguous">Ambiguous</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="text-xs text-white/60 block">
+                    Resolution note
+                    <textarea
+                      value={resolutionDraft.note}
+                      onChange={(e) => setResolutionDraft(prev => ({ ...prev, note: e.target.value }))}
+                      className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                      rows={2}
+                    />
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-white/70">
+                    <input
+                      type="checkbox"
+                      checked={resolutionDraft.publish}
+                      onChange={(e) => setResolutionDraft(prev => ({ ...prev, publish: e.target.checked }))}
+                    />
+                    Publish resolution to players
+                  </label>
+                  <button
+                    onClick={handleResolutionSave}
+                    className="px-3 py-2 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
+                  >
+                    Save Resolution
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-semibold">AI Verification</h5>
+                  {challengeDetail.aiVerification ? (
+                    <div className="p-3 rounded-lg bg-white/5 text-sm space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium">Verdict: {challengeDetail.aiVerification.verdict}</span>
+                        <span className="text-white/40">{Math.round(challengeDetail.aiVerification.confidence * 100)}%</span>
+                      </div>
+                      <div className="text-white/70">{challengeDetail.aiVerification.rationale}</div>
+                      {challengeDetail.aiVerification.suggested_correction && (
+                        <div className="text-white/60">Suggested: {challengeDetail.aiVerification.suggested_correction}</div>
+                      )}
+                      <div className="text-xs text-white/40">Published: {challengeDetail.aiVerification.published ? 'Yes' : 'No'}</div>
+                    </div>
+                  ) : (
+                    <p className="text-white/50 text-sm">No AI verification yet.</p>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={handleAIVerify}
+                      disabled={aiVerificationLoading}
+                      className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                    >
+                      {aiVerificationLoading ? 'Requesting...' : 'Request AI Verification'}
+                    </button>
+                    <button
+                      onClick={handlePublishAI}
+                      disabled={publishAiLoading || !challengeDetail.aiVerification}
+                      className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                    >
+                      {publishAiLoading ? 'Publishing...' : 'Publish AI Result'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <h5 className="font-semibold">Scoring Reconciliation</h5>
+                  <p className="text-xs text-white/60">Apply if resolution is invalid or ambiguous.</p>
+                  <label className="text-xs text-white/60 block">
+                    Policy
+                    <select
+                      value={reconcilePolicy}
+                      onChange={(e) => setReconcilePolicy(e.target.value)}
+                      className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                    >
+                      <option value="void">Void question</option>
+                      <option value="award_all">Award all</option>
+                      <option value="accept_multiple">Accept multiple answers</option>
+                    </select>
+                  </label>
+                  {reconcilePolicy === 'accept_multiple' && (
+                    <label className="text-xs text-white/60 block">
+                      Accepted answers (comma-separated indices)
+                      <input
+                        value={reconcileAnswers}
+                        onChange={(e) => setReconcileAnswers(e.target.value)}
+                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                        placeholder="e.g. 0,2"
+                      />
+                    </label>
+                  )}
+                  <button
+                    onClick={handleReconcile}
+                    className="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-sm hover:bg-amber-500/30"
+                  >
+                    Apply Reconciliation
+                  </button>
+                  {challengeDetail.reconciliation && (
+                    <div className="text-xs text-white/60">
+                      Applied policy: {challengeDetail.reconciliation.policy}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -21,6 +21,14 @@ export default function PlayerSession() {
   // New state for enhanced features
   const [timerRemaining, setTimerRemaining] = useState<number | null>(null)
   const [myRank, setMyRank] = useState<number | null>(null)
+
+  // Challenge state
+  const [challengeForm, setChallengeForm] = useState<{ questionIndex: number; source: 'review' | 'mid_game' } | null>(null)
+  const [challengeCategory, setChallengeCategory] = useState('')
+  const [challengeNote, setChallengeNote] = useState('')
+  const [challengeSubmitting, setChallengeSubmitting] = useState(false)
+  const [challengedQuestions, setChallengedQuestions] = useState<Set<number>>(new Set())
+  const [challengeMessage, setChallengeMessage] = useState<string | null>(null)
   
   // Track when question was shown for response time measurement
   const questionShownAtRef = useRef<number>(Date.now())
@@ -28,6 +36,39 @@ export default function PlayerSession() {
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
+
+  const challengeCategories = ['Incorrect answer', 'Ambiguous', 'Multiple valid', 'Outdated', 'Other']
+
+  const loadMyChallenges = async () => {
+    if (!code || !playerId) return
+    try {
+      const response = await api.getMyChallenges(code, playerId)
+      setChallengedQuestions(new Set(response.questionIndexes))
+    } catch {
+      // Ignore challenge list failures to avoid blocking play
+    }
+  }
+
+  const submitChallenge = async (questionIndex: number, source: 'review' | 'mid_game') => {
+    if (!code || !playerId) return
+    setChallengeSubmitting(true)
+    setChallengeMessage(null)
+    try {
+      await api.submitChallenge(code, playerId, questionIndex, challengeNote.trim() || undefined, challengeCategory || undefined, source)
+      setChallengedQuestions(prev => new Set([...prev, questionIndex]))
+      setChallengeMessage('Challenge submitted')
+      setChallengeForm(null)
+      setChallengeCategory('')
+      setChallengeNote('')
+    } catch (e) {
+      setChallengeMessage(e instanceof Error ? e.message : 'Failed to submit challenge')
+    }
+    setChallengeSubmitting(false)
+  }
+
+  useEffect(() => {
+    loadMyChallenges()
+  }, [code, playerId])
 
   useEffect(() => {
     if (!code || !playerId) {
@@ -52,6 +93,9 @@ export default function PlayerSession() {
           // Reset answer state for new question
           setSelectedAnswer(null)
           setAnswerLocked(false)
+          setChallengeForm(null)
+          setChallengeCategory('')
+          setChallengeNote('')
           // Record when this question was shown
           questionShownAtRef.current = Date.now()
           break
@@ -65,6 +109,7 @@ export default function PlayerSession() {
             // We need to compute individual answers from the results
             setMyResults(msg.results.questions)
           }
+          loadMyChallenges()
           break
         case 'timer_tick':
           setTimerRemaining(msg.remaining)
@@ -80,6 +125,37 @@ export default function PlayerSession() {
           if (myEntry) {
             setMyRank(myEntry.rank)
           }
+          setResults(prev => prev ? {
+            ...prev,
+            players: prev.players.map(p => {
+              const entry = msg.leaderboard.find(e => e.id === p.id)
+              return entry ? { ...p, score: entry.score, rank: entry.rank } : p
+            })
+          } : prev)
+          break
+        case 'challenge_resolution':
+          setMyResults(prev => prev ? prev.map((q, index) => index === msg.questionIndex ? {
+            ...q,
+            challengeStatus: msg.resolution.status,
+            resolutionVerdict: msg.resolution.verdict,
+            resolutionNote: msg.resolution.resolutionNote
+          } : q) : prev)
+          break
+        case 'challenge_ai_published':
+          setMyResults(prev => prev ? prev.map((q, index) => index === msg.questionIndex ? {
+            ...q,
+            aiVerdict: msg.aiVerification.verdict,
+            aiConfidence: msg.aiVerification.confidence,
+            aiRationale: msg.aiVerification.rationale,
+            aiSuggestedCorrection: msg.aiVerification.suggested_correction
+          } : q) : prev)
+          break
+        case 'scores_reconciled':
+          setMyResults(prev => prev ? prev.map((q, index) => index === msg.questionIndex ? {
+            ...q,
+            scoringPolicy: msg.policy.policy,
+            acceptedAnswers: msg.policy.acceptedAnswers
+          } : q) : prev)
           break
         case 'error':
           setError(msg.message)
@@ -209,6 +285,13 @@ export default function PlayerSession() {
         </div>
       )}
 
+      {challengeMessage && (
+        <div className="mb-4 p-3 bg-white/10 border border-white/20 rounded-lg text-white/80 text-sm">
+          {challengeMessage}
+          <button onClick={() => setChallengeMessage(null)} className="ml-2 underline">dismiss</button>
+        </div>
+      )}
+
       {/* Lobby State */}
       {session.status === 'lobby' && (
         <div className="flex-1 flex flex-col items-center justify-center animate-slide-up">
@@ -239,6 +322,54 @@ export default function PlayerSession() {
               {currentQuestion.question}
             </h2>
           </div>
+
+          <div className="flex items-center justify-between mb-2">
+            <button
+              onClick={() => setChallengeForm({ questionIndex: session.currentQuestionIndex, source: 'mid_game' })}
+              disabled={challengedQuestions.has(session.currentQuestionIndex)}
+              className="text-xs px-2 py-1 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 disabled:opacity-50"
+            >
+              {challengedQuestions.has(session.currentQuestionIndex) ? 'Flagged' : 'Flag / Challenge'}
+            </button>
+          </div>
+
+          {challengeForm?.source === 'mid_game' && challengeForm.questionIndex === session.currentQuestionIndex && (
+            <div className="mb-2 p-3 rounded-xl bg-white/5 border border-white/10">
+              <div className="text-xs text-white/60 mb-2">Quick flag (optional note)</div>
+              <select
+                value={challengeCategory}
+                onChange={(e) => setChallengeCategory(e.target.value)}
+                className="w-full mb-2 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+              >
+                <option value="">Select a category (optional)</option>
+                {challengeCategories.map(category => (
+                  <option key={category} value={category}>{category}</option>
+                ))}
+              </select>
+              <textarea
+                value={challengeNote}
+                onChange={(e) => setChallengeNote(e.target.value)}
+                className="w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                rows={2}
+                placeholder="Short note (optional)"
+              />
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => submitChallenge(session.currentQuestionIndex, 'mid_game')}
+                  disabled={challengeSubmitting}
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                >
+                  {challengeSubmitting ? 'Submitting...' : 'Submit Flag'}
+                </button>
+                <button
+                  onClick={() => setChallengeForm(null)}
+                  className="px-3 py-2 rounded-lg bg-white/5 text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Options */}
           <div className="flex-1 grid grid-cols-1 gap-1 min-h-0 auto-rows-min">
@@ -379,10 +510,88 @@ export default function PlayerSession() {
                     <span className="text-white/50">Not answered</span>
                   )}
                 </div>
+                <div className="mt-2 space-y-1 text-sm text-white/70">
+                  {q.options.map((option, idx) => (
+                    <div key={idx} className={idx === q.correct ? 'text-green-300' : ''}>
+                      {String.fromCharCode(65 + idx)}. {option}{idx === q.correct ? ' ✓' : ''}
+                    </div>
+                  ))}
+                </div>
                 {q.explanation && (
                   <p className="text-white/60 text-sm mt-2 italic">
                     💡 {q.explanation}
                   </p>
+                )}
+
+                {q.challengeStatus && (
+                  <div className="mt-2 text-xs text-white/70">
+                    Resolution: {q.challengeStatus}
+                    {q.resolutionVerdict && ` • ${q.resolutionVerdict}`}
+                    {q.resolutionNote && <span className="block text-white/60 mt-1">{q.resolutionNote}</span>}
+                  </div>
+                )}
+
+                {q.scoringPolicy && (
+                  <div className="mt-1 text-xs text-white/60">
+                    Scoring policy: {q.scoringPolicy}
+                    {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
+                      <span> (accepted: {q.acceptedAnswers.join(', ')})</span>
+                    )}
+                  </div>
+                )}
+
+                {q.aiVerdict && (
+                  <div className="mt-2 text-xs text-white/60">
+                    AI: {q.aiVerdict} ({Math.round((q.aiConfidence ?? 0) * 100)}%)
+                    {q.aiRationale && <span className="block mt-1">{q.aiRationale}</span>}
+                  </div>
+                )}
+
+                <div className="mt-3">
+                  <button
+                    onClick={() => setChallengeForm({ questionIndex: i, source: 'review' })}
+                    disabled={challengedQuestions.has(i)}
+                    className="text-xs px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 disabled:opacity-50"
+                  >
+                    {challengedQuestions.has(i) ? 'Challenge submitted' : 'Challenge this question'}
+                  </button>
+                </div>
+
+                {challengeForm?.source === 'review' && challengeForm.questionIndex === i && (
+                  <div className="mt-2 p-3 rounded-xl bg-white/5 border border-white/10">
+                    <select
+                      value={challengeCategory}
+                      onChange={(e) => setChallengeCategory(e.target.value)}
+                      className="w-full mb-2 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                    >
+                      <option value="">Select a category (optional)</option>
+                      {challengeCategories.map(category => (
+                        <option key={category} value={category}>{category}</option>
+                      ))}
+                    </select>
+                    <textarea
+                      value={challengeNote}
+                      onChange={(e) => setChallengeNote(e.target.value)}
+                      className="w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                      rows={2}
+                      placeholder="Optional feedback"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        onClick={() => submitChallenge(i, 'review')}
+                        disabled={challengeSubmitting}
+                        className="flex-1 px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                      >
+                        {challengeSubmitting ? 'Submitting...' : 'Submit Challenge'}
+                      </button>
+                      <button
+                        onClick={() => setChallengeForm(null)}
+                        className="px-3 py-2 rounded-lg bg-white/5 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
                 )}
               </div>
             ))}

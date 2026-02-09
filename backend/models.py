@@ -55,6 +55,15 @@ class QuestionResult(BaseModel):
     points: int
     yourAnswer: Optional[int] = None
     answeredCorrectly: Optional[bool] = None
+    challengeStatus: Optional[str] = None
+    resolutionVerdict: Optional[str] = None
+    resolutionNote: Optional[str] = None
+    aiVerdict: Optional[str] = None
+    aiConfidence: Optional[float] = None
+    aiRationale: Optional[str] = None
+    aiSuggestedCorrection: Optional[str] = None
+    scoringPolicy: Optional[str] = None
+    acceptedAnswers: Optional[list[int]] = None
 
 
 class RevealResults(BaseModel):
@@ -83,6 +92,49 @@ class AnswerStatus(BaseModel):
     waiting: list[str]   # Player IDs who haven't answered
 
 
+class ChallengeSubmission(BaseModel):
+    playerId: str
+    nickname: str
+    questionIndex: int
+    category: Optional[str] = None
+    note: Optional[str] = None
+    source: str = "review"  # review | mid_game
+    createdAt: float
+
+
+class ChallengeResolution(BaseModel):
+    status: str = "open"  # open | under_review | resolved
+    verdict: Optional[str] = None  # valid | invalid | ambiguous
+    resolutionNote: Optional[str] = None
+    resolvedAt: Optional[float] = None
+    resolvedBy: Optional[str] = None
+    published: bool = False
+
+
+class AIVerification(BaseModel):
+    verdict: str
+    confidence: float
+    rationale: str
+    suggested_correction: Optional[str] = None
+    requestedAt: float
+    published: bool = False
+    publishedAt: Optional[float] = None
+
+
+class ReconciliationPolicy(BaseModel):
+    policy: str  # void | award_all | accept_multiple
+    acceptedAnswers: Optional[list[int]] = None
+    appliedAt: float
+    appliedBy: str
+
+
+class ScoreAuditEntry(BaseModel):
+    questionIndex: int
+    policy: str
+    appliedAt: float
+    deltas: dict[str, int]
+
+
 @dataclass
 class Session:
     code: str
@@ -100,6 +152,11 @@ class Session:
     timer_task: Optional[object] = None  # asyncio Task reference
     auto_progress_mode: bool = False
     auto_progress_percent: int = 90
+    challenges: dict[int, dict[str, ChallengeSubmission]] = field(default_factory=dict)
+    challenge_resolutions: dict[int, ChallengeResolution] = field(default_factory=dict)
+    ai_verifications: dict[int, AIVerification] = field(default_factory=dict)
+    reconciliations: dict[int, ReconciliationPolicy] = field(default_factory=dict)
+    score_audit: list[ScoreAuditEntry] = field(default_factory=list)
     
     def to_state(self, include_answers: bool = False) -> SessionState:
         """Convert to client-facing state (without correct answers during play)"""
@@ -139,13 +196,34 @@ class Session:
     def calculate_scores(self) -> None:
         """Calculate scores for all players based on their answers"""
         for player in self.players.values():
-            score = 0
-            for q_idx, choice in player.answers.items():
-                if q_idx < len(self.questions):
-                    question = self.questions[q_idx]
+            player.score = 0
+
+        for q_idx, question in enumerate(self.questions):
+            policy = self.reconciliations.get(q_idx)
+
+            if policy and policy.policy == "void":
+                continue
+
+            if policy and policy.policy == "award_all":
+                for player in self.players.values():
+                    player.score += question.points
+                continue
+
+            accepted = None
+            if policy and policy.policy == "accept_multiple":
+                accepted = set(policy.acceptedAnswers or [])
+                accepted.add(question.correct)
+
+            for player in self.players.values():
+                if q_idx not in player.answers:
+                    continue
+                choice = player.answers[q_idx]
+                if accepted is not None:
+                    if choice in accepted:
+                        player.score += question.points
+                else:
                     if choice == question.correct:
-                        score += question.points
-            player.score = score
+                        player.score += question.points
     
     def get_reveal_results(self, player_id: Optional[str] = None) -> RevealResults:
         """Get results for reveal, optionally personalized for a player"""
@@ -193,6 +271,14 @@ class Session:
             if requesting_player and i in requesting_player.answers:
                 your_answer = requesting_player.answers[i]
                 answered_correctly = your_answer == q.correct
+
+            resolution = self.challenge_resolutions.get(i)
+            ai_verification = self.ai_verifications.get(i)
+            reconciliation = self.reconciliations.get(i)
+
+            include_resolution = resolution if resolution and resolution.published else None
+            include_ai = ai_verification if ai_verification and ai_verification.published else None
+            accepted_answers = reconciliation.acceptedAnswers if reconciliation else None
             
             question_results.append(QuestionResult(
                 question=q.question,
@@ -201,7 +287,16 @@ class Session:
                 explanation=q.explanation,
                 points=q.points,
                 yourAnswer=your_answer,
-                answeredCorrectly=answered_correctly
+                answeredCorrectly=answered_correctly,
+                challengeStatus=include_resolution.status if include_resolution else None,
+                resolutionVerdict=include_resolution.verdict if include_resolution else None,
+                resolutionNote=include_resolution.resolutionNote if include_resolution else None,
+                aiVerdict=include_ai.verdict if include_ai else None,
+                aiConfidence=include_ai.confidence if include_ai else None,
+                aiRationale=include_ai.rationale if include_ai else None,
+                aiSuggestedCorrection=include_ai.suggested_correction if include_ai else None,
+                scoringPolicy=reconciliation.policy if reconciliation else None,
+                acceptedAnswers=accepted_answers
             ))
         
         return RevealResults(
@@ -211,32 +306,56 @@ class Session:
 
     def get_live_leaderboard(self) -> list[LiveLeaderboardEntry]:
         """Get current leaderboard with scores calculated so far"""
-        # Calculate current scores
-        entries = []
+        # Calculate current scores with reconciliation policies
+        entries: dict[str, dict] = {}
         for player in self.players.values():
-            score = 0
-            correct_count = 0
-            for q_idx, choice in player.answers.items():
-                if q_idx < len(self.questions):
-                    question = self.questions[q_idx]
-                    if choice == question.correct:
-                        score += question.points
-                        correct_count += 1
-            entries.append({
+            entries[player.id] = {
                 'id': player.id,
                 'nickname': player.nickname,
-                'score': score,
-                'correctAnswers': correct_count,
+                'score': 0,
+                'correctAnswers': 0,
                 'totalAnswers': len(player.answers),
                 'totalTime': sum(player.answer_times.values())
-            })
+            }
+
+        for q_idx, question in enumerate(self.questions):
+            policy = self.reconciliations.get(q_idx)
+
+            if policy and policy.policy == 'void':
+                continue
+
+            if policy and policy.policy == 'award_all':
+                for entry in entries.values():
+                    entry['score'] += question.points
+                    entry['correctAnswers'] += 1
+                continue
+
+            accepted = None
+            if policy and policy.policy == 'accept_multiple':
+                accepted = set(policy.acceptedAnswers or [])
+                accepted.add(question.correct)
+
+            for player in self.players.values():
+                if q_idx not in player.answers:
+                    continue
+                choice = player.answers[q_idx]
+                if accepted is not None:
+                    if choice in accepted:
+                        entries[player.id]['score'] += question.points
+                        entries[player.id]['correctAnswers'] += 1
+                else:
+                    if choice == question.correct:
+                        entries[player.id]['score'] += question.points
+                        entries[player.id]['correctAnswers'] += 1
+
+        entries_list = list(entries.values())
         
         # Sort by score desc, then by time asc
-        entries.sort(key=lambda e: (-e['score'], e['totalTime']))
+        entries_list.sort(key=lambda e: (-e['score'], e['totalTime']))
         
         # Assign ranks
         result = []
-        for i, e in enumerate(entries):
+        for i, e in enumerate(entries_list):
             result.append(LiveLeaderboardEntry(
                 id=e['id'],
                 nickname=e['nickname'],
