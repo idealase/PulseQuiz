@@ -29,6 +29,12 @@ export default function PlayerSession() {
   const [challengeSubmitting, setChallengeSubmitting] = useState(false)
   const [challengedQuestions, setChallengedQuestions] = useState<Set<number>>(new Set())
   const [challengeMessage, setChallengeMessage] = useState<string | null>(null)
+
+  // Feedback state
+  const [feedbackByQuestion, setFeedbackByQuestion] = useState<Record<number, string>>({})
+  const [feedbackTypeByQuestion, setFeedbackTypeByQuestion] = useState<Record<number, string>>({})
+  const [feedbackSending, setFeedbackSending] = useState<number | null>(null)
+  const [feedbackSent, setFeedbackSent] = useState<Record<number, boolean>>({})
   
   // Track when question was shown for response time measurement
   const questionShownAtRef = useRef<number>(Date.now())
@@ -208,6 +214,34 @@ export default function PlayerSession() {
       setError(e instanceof Error ? e.message : 'Failed to submit answer')
       setAnswerLocked(false)
     }
+  }
+
+  const handleSubmitFeedback = async (questionIndex: number) => {
+    if (!code || !playerId || !results) return
+
+    const message = (feedbackByQuestion[questionIndex] || '').trim()
+    if (!message) {
+      setError('Please enter feedback before sending')
+      return
+    }
+
+    setFeedbackSending(questionIndex)
+    try {
+      const resultQuestion = results.questions[questionIndex]
+      await api.submitFeedback(code, {
+        playerId,
+        questionIndex,
+        message,
+        feedbackType: feedbackTypeByQuestion[questionIndex] || 'question',
+        selectedChoice: resultQuestion?.yourAnswer ?? null,
+        correctChoice: resultQuestion?.correct ?? null,
+      })
+
+      setFeedbackSent(prev => ({ ...prev, [questionIndex]: true }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to send feedback')
+    }
+    setFeedbackSending(null)
   }
 
   if (!session) {
@@ -593,6 +627,41 @@ export default function PlayerSession() {
                     </div>
                   </div>
                 )}
+
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <label className="text-xs text-white/60">Feedback about</label>
+                    <select
+                      value={feedbackTypeByQuestion[i] || 'question'}
+                      onChange={(e) => setFeedbackTypeByQuestion(prev => ({ ...prev, [i]: e.target.value }))}
+                      className="bg-white/10 border border-white/20 rounded-md text-xs px-2 py-1"
+                      disabled={feedbackSent[i]}
+                    >
+                      <option value="question">Question</option>
+                      <option value="answer">Answer</option>
+                      <option value="both">Both</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  <textarea
+                    value={feedbackByQuestion[i] || ''}
+                    onChange={(e) => setFeedbackByQuestion(prev => ({ ...prev, [i]: e.target.value }))}
+                    placeholder="Tell us what's unclear or incorrect..."
+                    rows={2}
+                    className="w-full text-xs px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-secondary focus:outline-none"
+                    disabled={feedbackSent[i]}
+                  />
+                  <div className="mt-2 flex items-center justify-between">
+                    <span className="text-xs text-white/40">Feedback goes to the backend logs</span>
+                    <button
+                      onClick={() => handleSubmitFeedback(i)}
+                      disabled={feedbackSent[i] || feedbackSending === i}
+                      className="px-3 py-1 text-xs font-semibold rounded-lg bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {feedbackSent[i] ? 'Sent' : feedbackSending === i ? 'Sending...' : 'Send'}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
           </div>

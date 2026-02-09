@@ -15,6 +15,7 @@ import traceback
 import sys
 import subprocess
 import shutil
+import random
 
 from models import (
     Session, Question, Player, GameSettings,
@@ -153,6 +154,24 @@ class ReconcileRequest(BaseModel):
     note: Optional[str] = None
 
 
+class FeedbackRequest(BaseModel):
+    playerId: Optional[str] = None
+    questionIndex: int
+    message: str
+    feedbackType: Optional[str] = None  # question | answer | both | other
+    selectedChoice: Optional[int] = None
+    correctChoice: Optional[int] = None
+
+
+class SoloFeedbackRequest(BaseModel):
+    question: str
+    options: list[str]
+    message: str
+    feedbackType: Optional[str] = None  # question | answer | both | other
+    selectedChoice: Optional[int] = None
+    correctChoice: Optional[int] = None
+
+
 class ObserveResponse(BaseModel):
     observerId: str
 
@@ -218,7 +237,9 @@ def verify_auth_token(token: str) -> bool:
     if not QUIZ_AUTH_SECRET:
         logger.warning("⚠️  QUIZ_AUTH_SECRET not set - AI endpoints unprotected!")
         return True  # Allow if not configured (dev mode)
-    return token == QUIZ_AUTH_SECRET
+    normalized_token = (token or "").strip().lower()
+    normalized_secret = QUIZ_AUTH_SECRET.strip().lower()
+    return normalized_token == normalized_secret
 
 
 QUIZ_SYSTEM_PROMPT = """You are a quiz question generator for a live trivia game. Generate engaging, accurate multiple-choice questions.
@@ -269,10 +290,28 @@ def parse_questions_from_response(content: str) -> List[Question]:
         questions = []
         for i, q in enumerate(questions_data):
             try:
+                raw_options = q.get('options', [])
+                options = [str(opt) for opt in raw_options][:4]
+                if not options:
+                    raise KeyError("options")
+
+                raw_correct = q.get('correct', 0)
+                try:
+                    correct_index = int(raw_correct)
+                except (TypeError, ValueError):
+                    correct_index = 0
+
+                if correct_index < 0 or correct_index >= len(options):
+                    correct_index = 0
+
+                correct_answer = options[correct_index]
+                random.shuffle(options)
+                shuffled_correct_index = options.index(correct_answer)
+
                 question = Question(
                     question=q['question'],
-                    options=q['options'][:4],  # Ensure max 4 options
-                    correct=min(q['correct'], 3),  # Ensure valid index
+                    options=options,
+                    correct=shuffled_correct_index,
                     points=q.get('points', 1),
                     explanation=q.get('explanation')
                 )
@@ -1533,6 +1572,89 @@ async def reconcile_scores(
         "policy": policy.model_dump(),
         "audit": audit_entry.model_dump()
     }
+
+
+@app.post("/api/session/{code}/feedback")
+async def submit_feedback(code: str, request: FeedbackRequest):
+    """Submit feedback for a question or answer (player/host/observer)"""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+
+    player = None
+    if request.playerId:
+        player = session.players.get(request.playerId)
+        if not player:
+            raise HTTPException(status_code=404, detail="Player not found")
+
+    if request.questionIndex < 0 or request.questionIndex >= len(session.questions):
+        raise HTTPException(status_code=400, detail="Invalid question index")
+
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Feedback message is required")
+
+    question = session.questions[request.questionIndex]
+    selected_text = None
+    correct_text = None
+
+    if request.selectedChoice is not None and 0 <= request.selectedChoice < len(question.options):
+        selected_text = question.options[request.selectedChoice]
+    if request.correctChoice is not None and 0 <= request.correctChoice < len(question.options):
+        correct_text = question.options[request.correctChoice]
+
+    feedback_record = {
+        "session": code,
+        "playerId": request.playerId,
+        "nickname": player.nickname if player else None,
+        "questionIndex": request.questionIndex,
+        "question": question.question,
+        "selectedChoice": request.selectedChoice,
+        "selectedText": selected_text,
+        "correctChoice": request.correctChoice,
+        "correctText": correct_text,
+        "feedbackType": request.feedbackType,
+        "message": message,
+    }
+
+    logger.info("🗣️ Feedback received: %s", json.dumps(feedback_record, ensure_ascii=True))
+
+    return {"ok": True}
+
+
+@app.post("/api/feedback")
+async def submit_solo_feedback(request: SoloFeedbackRequest):
+    """Submit feedback without a session (solo mode)"""
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Feedback message is required")
+
+    selected_text = None
+    correct_text = None
+    if request.selectedChoice is not None and 0 <= request.selectedChoice < len(request.options):
+        selected_text = request.options[request.selectedChoice]
+    if request.correctChoice is not None and 0 <= request.correctChoice < len(request.options):
+        correct_text = request.options[request.correctChoice]
+
+    feedback_record = {
+        "session": None,
+        "playerId": None,
+        "nickname": None,
+        "questionIndex": None,
+        "question": request.question,
+        "selectedChoice": request.selectedChoice,
+        "selectedText": selected_text,
+        "correctChoice": request.correctChoice,
+        "correctText": correct_text,
+        "feedbackType": request.feedbackType,
+        "message": message,
+        "source": "solo",
+    }
+
+    logger.info("🗣️ Feedback received: %s", json.dumps(feedback_record, ensure_ascii=True))
+
+    return {"ok": True}
 
 
 # --- WebSocket Endpoint ---
