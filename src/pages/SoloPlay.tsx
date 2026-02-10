@@ -22,7 +22,7 @@ type DynamicConfig = {
 
 export default function SoloPlay() {
   const config = useConfig()
-  const { applyTheme, lockTheme, intensity } = useTheme()
+  const { applyTheme, lockTheme, intensity, experimentalTheme } = useTheme()
   const api = new ApiClient(config.apiBaseUrl)
 
   // Setup phase state
@@ -223,7 +223,7 @@ export default function SoloPlay() {
       setCsvErrors([])
       setGenerationTime(Date.now() - startTime)
 
-      if (!lockTheme) {
+      if (!lockTheme && experimentalTheme) {
         try {
           const themeResult = await api.generateTheme({
             topic: aiTopics.trim(),
@@ -267,6 +267,11 @@ export default function SoloPlay() {
 
     if (!aiAuthToken.trim()) {
       setError('Auth token required for theme preview')
+      return
+    }
+
+    if (!experimentalTheme) {
+      setError('Enable Experimental Theme Generation in Settings')
       return
     }
 
@@ -519,7 +524,7 @@ export default function SoloPlay() {
 
               <button
                 onClick={handleThemePreview}
-                disabled={themeGenerating || !aiTopics.trim() || lockTheme}
+                disabled={themeGenerating || !aiTopics.trim() || lockTheme || !experimentalTheme}
                 className="w-full py-2.5 px-6 border border-indigo-500/50 rounded-xl font-semibold text-indigo-200 hover:bg-indigo-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}

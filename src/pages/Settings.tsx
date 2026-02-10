@@ -2,7 +2,16 @@ import { useEffect, useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
 
 export default function Settings() {
-  const { theme, lockTheme, intensity, applyTheme, setLockTheme, setIntensity } = useTheme()
+  const {
+    theme,
+    lockTheme,
+    intensity,
+    experimentalTheme,
+    applyTheme,
+    setLockTheme,
+    setIntensity,
+    setExperimentalTheme
+  } = useTheme()
   const [reduceMotion, setReduceMotion] = useState(false)
   const [showHints, setShowHints] = useState(true)
 
@@ -30,6 +39,19 @@ export default function Settings() {
       </div>
 
       <div className="space-y-4">
+        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+          <div>
+            <p className="font-semibold">Experimental Theme Generation</p>
+            <p className="text-sm text-white/50">Let AI apply theme tokens for new quizzes</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={experimentalTheme}
+            onChange={(e) => setExperimentalTheme(e.target.checked)}
+            className="h-5 w-5 accent-primary"
+          />
+        </label>
+
         <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Lock Theme</p>

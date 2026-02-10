@@ -12,7 +12,7 @@ import { setLastSession } from '../utils/sessionResume'
 export default function HostCreate() {
   const config = useConfig()
   const navigate = useNavigate()
-  const { applyTheme, lockTheme, intensity } = useTheme()
+  const { applyTheme, lockTheme, intensity, experimentalTheme } = useTheme()
   
   const [sessionCode, setSessionCode] = useState<string | null>(null)
   const [hostToken, setHostToken] = useState<string | null>(null)
@@ -186,7 +186,7 @@ export default function HostCreate() {
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
 
-      if (!lockTheme) {
+      if (!lockTheme && experimentalTheme) {
         try {
           const themeResult = await api.generateTheme({
             topic: aiTopics,
@@ -223,6 +223,11 @@ export default function HostCreate() {
     if (!aiAuthToken.trim()) {
       setShowAuthInput(true)
       setError('Please enter your access code')
+      return
+    }
+
+    if (!experimentalTheme) {
+      setError('Enable Experimental Theme Generation in Settings')
       return
     }
 
@@ -533,7 +538,7 @@ export default function HostCreate() {
 
             <button
               onClick={handleThemePreview}
-              disabled={themeGenerating || !aiTopics.trim() || lockTheme}
+              disabled={themeGenerating || !aiTopics.trim() || lockTheme || !experimentalTheme}
               className="w-full py-2.5 px-6 font-semibold rounded-xl border border-purple-500/50 text-purple-200 hover:bg-purple-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}

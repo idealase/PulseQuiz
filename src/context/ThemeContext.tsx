@@ -25,6 +25,7 @@ const DEFAULT_THEME: ThemeSpec = {
 const STORAGE_THEME = 'pref_theme_spec'
 const STORAGE_LOCK = 'pref_lock_theme'
 const STORAGE_INTENSITY = 'pref_theme_intensity'
+const STORAGE_EXPERIMENTAL = 'pref_experimental_theme'
 
 const FONT_STACKS: Record<string, string> = {
   system: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif",
@@ -38,9 +39,11 @@ const ThemeContext = createContext<{
   theme: ThemeSpec
   lockTheme: boolean
   intensity: ThemeIntensity
+  experimentalTheme: boolean
   applyTheme: (theme: ThemeSpec, persist?: boolean) => void
   setLockTheme: (value: boolean) => void
   setIntensity: (value: ThemeIntensity) => void
+  setExperimentalTheme: (value: boolean) => void
 } | null>(null)
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } | null {
@@ -122,6 +125,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [intensity, setIntensityState] = useState<ThemeIntensity>(
     () => (localStorage.getItem(STORAGE_INTENSITY) as ThemeIntensity) || 'subtle'
   )
+  const [experimentalTheme, setExperimentalThemeState] = useState(
+    () => localStorage.getItem(STORAGE_EXPERIMENTAL) === 'true'
+  )
 
   useEffect(() => {
     applyThemeToDocument(theme)
@@ -144,9 +150,32 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_INTENSITY, value)
   }, [])
 
+  const setExperimentalTheme = useCallback((value: boolean) => {
+    setExperimentalThemeState(value)
+    localStorage.setItem(STORAGE_EXPERIMENTAL, String(value))
+  }, [])
+
   const value = useMemo(
-    () => ({ theme, lockTheme, intensity, applyTheme, setLockTheme, setIntensity }),
-    [theme, lockTheme, intensity, applyTheme, setLockTheme, setIntensity]
+    () => ({
+      theme,
+      lockTheme,
+      intensity,
+      experimentalTheme,
+      applyTheme,
+      setLockTheme,
+      setIntensity,
+      setExperimentalTheme
+    }),
+    [
+      theme,
+      lockTheme,
+      intensity,
+      experimentalTheme,
+      applyTheme,
+      setLockTheme,
+      setIntensity,
+      setExperimentalTheme
+    ]
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
