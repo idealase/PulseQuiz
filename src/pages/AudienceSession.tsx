@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
+import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 
 export default function AudienceSession() {
   const { code } = useParams<{ code: string }>()
@@ -23,6 +24,9 @@ export default function AudienceSession() {
   
   const observerId = sessionStorage.getItem(`observer_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
+  const shouldGuard = Boolean(session && code && observerId)
+
+  useSessionLeaveGuard(shouldGuard, 'You have an active session. Leaving will end your participation. Continue?')
 
   useEffect(() => {
     if (!code || !observerId) {
@@ -133,7 +137,6 @@ export default function AudienceSession() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link to="/" className="text-white/60 hover:text-white text-sm">← Home</Link>
           <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
         </div>
         <div className="flex items-center gap-4">

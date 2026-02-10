@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient } from '../api/client'
+import { setLastSession } from '../utils/sessionResume'
 
 export default function PlayerJoin() {
   const { code: urlCode } = useParams<{ code: string }>()
@@ -31,6 +32,7 @@ export default function PlayerJoin() {
       // Store player ID
       sessionStorage.setItem(`player_${code.toUpperCase()}`, result.playerId)
       sessionStorage.setItem(`nickname_${code.toUpperCase()}`, nickname.trim())
+      setLastSession('player', code.toUpperCase())
       navigate(`/play/${code.toUpperCase()}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to join session')
@@ -41,10 +43,6 @@ export default function PlayerJoin() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <Link to="/" className="absolute top-6 left-6 text-white/60 hover:text-white">
-        ← Back
-      </Link>
-
       <div className="w-full max-w-sm animate-slide-up">
         <h1 className="text-3xl font-bold text-center mb-8">Join Game</h1>
 

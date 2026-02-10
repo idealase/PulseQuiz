@@ -1,11 +1,12 @@
 import { useState, useCallback, useRef } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
 import { QRCodeSVG } from 'qrcode.react'
 import { questionSets, getShuffledQuestionsFromSet, QuestionSetId } from '../data/defaultQuestions'
+import { setLastSession } from '../utils/sessionResume'
 
 export default function HostCreate() {
   const config = useConfig()
@@ -26,6 +27,10 @@ export default function HostCreate() {
   // Auto-progress settings
   const [autoProgressMode, setAutoProgressMode] = useState(false)
   const [autoProgressPercent, setAutoProgressPercent] = useState(90)
+
+  // Host role settings
+  const [hostRole, setHostRole] = useState<'host_player' | 'host_only'>('host_player')
+  const [hostNickname, setHostNickname] = useState('Host')
 
   // AI Generation settings
   const [aiTopics, setAiTopics] = useState('')
@@ -53,6 +58,19 @@ export default function HostCreate() {
       })
       setSessionCode(result.code)
       setHostToken(result.hostToken)
+
+      sessionStorage.setItem(`host_role_${result.code}`, hostRole)
+      setLastSession('host', result.code)
+
+      if (hostRole === 'host_player') {
+        const nickname = hostNickname.trim() || 'Host'
+        const joinResult = await api.joinSession(result.code, nickname)
+        sessionStorage.setItem(`host_player_${result.code}`, joinResult.playerId)
+        sessionStorage.setItem(`host_player_name_${result.code}`, nickname)
+      } else {
+        sessionStorage.removeItem(`host_player_${result.code}`)
+        sessionStorage.removeItem(`host_player_name_${result.code}`)
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create session')
     }
@@ -109,6 +127,7 @@ export default function HostCreate() {
       await api.uploadQuestions(sessionCode, hostToken, questionsToUpload)
       // Store host token in sessionStorage for the session page
       sessionStorage.setItem(`host_${sessionCode}`, hostToken)
+      setLastSession('host', sessionCode)
       // Store dynamic mode preference if enabled
       if (aiDynamicMode) {
         sessionStorage.setItem(`dynamic_${sessionCode}`, JSON.stringify({
@@ -186,17 +205,57 @@ export default function HostCreate() {
 
   return (
     <div className="min-h-screen p-6 max-w-lg mx-auto">
-      <Link to="/" className="text-white/60 hover:text-white mb-4 inline-block">
-        ← Back
-      </Link>
-
-      <h1 className="text-3xl font-bold mb-8 text-center">Host a Quiz</h1>
+      <h1 className="text-3xl font-bold mb-8 text-center">Start a Game</h1>
 
       {!sessionCode ? (
         <div className="space-y-6 animate-slide-up">
           {/* Timer Mode Settings */}
           <div className="bg-white/10 rounded-2xl p-6">
             <h2 className="text-lg font-bold mb-4">Game Settings</h2>
+
+            <div className="mb-5 space-y-3">
+              <p className="text-white/60 text-sm">Host Role</p>
+              <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors">
+                <input
+                  type="radio"
+                  name="hostRole"
+                  checked={hostRole === 'host_player'}
+                  onChange={() => setHostRole('host_player')}
+                  className="w-5 h-5 mt-0.5 accent-primary"
+                />
+                <div>
+                  <span className="font-medium">Host + Player 1 (default)</span>
+                  <p className="text-white/40 text-xs mt-0.5">Play while hosting</p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-white/5 transition-colors">
+                <input
+                  type="radio"
+                  name="hostRole"
+                  checked={hostRole === 'host_only'}
+                  onChange={() => setHostRole('host_only')}
+                  className="w-5 h-5 mt-0.5 accent-primary"
+                />
+                <div>
+                  <span className="font-medium">Host only (non-playing)</span>
+                  <p className="text-white/40 text-xs mt-0.5">Facilitate without answering</p>
+                </div>
+              </label>
+
+              {hostRole === 'host_player' && (
+                <div className="mt-2 ml-8">
+                  <label className="text-white/60 text-sm">Host nickname</label>
+                  <input
+                    type="text"
+                    value={hostNickname}
+                    onChange={(e) => setHostNickname(e.target.value)}
+                    maxLength={20}
+                    className="mt-2 w-full px-4 py-2 rounded-lg bg-white/10 border border-white/20 focus:border-primary focus:outline-none"
+                    placeholder="Host"
+                  />
+                </div>
+              )}
+            </div>
             
             <label className="flex items-center gap-3 cursor-pointer mb-4">
               <input
@@ -269,7 +328,7 @@ export default function HostCreate() {
             disabled={loading}
             className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Creating...' : 'Create Session'}
+            {loading ? 'Starting...' : 'Start Game'}
           </button>
           
           {error && (

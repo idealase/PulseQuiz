@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, QuestionResult } from '../types'
+import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 
 export default function PlayerSession() {
   const { code } = useParams<{ code: string }>()
@@ -42,6 +43,9 @@ export default function PlayerSession() {
   const playerId = sessionStorage.getItem(`player_${code}`)
   const nickname = sessionStorage.getItem(`nickname_${code}`)
   const api = new ApiClient(config.apiBaseUrl)
+  const shouldGuard = Boolean(session && code && playerId)
+
+  useSessionLeaveGuard(shouldGuard, 'You have an active session. Leaving will end your participation. Continue?')
 
   const challengeCategories = ['Incorrect answer', 'Ambiguous', 'Multiple valid', 'Outdated', 'Other']
 

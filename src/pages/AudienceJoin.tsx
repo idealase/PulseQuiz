@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient } from '../api/client'
+import { setLastSession } from '../utils/sessionResume'
 
 export default function AudienceJoin() {
   const { code: urlCode } = useParams<{ code: string }>()
@@ -30,6 +31,7 @@ export default function AudienceJoin() {
     try {
       const result = await api.observeSession(code.toUpperCase())
       sessionStorage.setItem(`observer_${code.toUpperCase()}`, result.observerId)
+      setLastSession('observer', code.toUpperCase())
       navigate(`/audience/${code.toUpperCase()}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to join as observer')
@@ -39,10 +41,6 @@ export default function AudienceJoin() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <Link to="/" className="absolute top-6 left-6 text-white/60 hover:text-white">
-        ← Back
-      </Link>
-
       <div className="w-full max-w-sm animate-slide-up">
         <h1 className="text-3xl font-bold mb-2 text-center">👀 Watch Game</h1>
         <p className="text-white/60 text-center mb-8">

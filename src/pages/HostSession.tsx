@@ -11,6 +11,7 @@ import {
   ChallengeSummary,
   ChallengeDetail
 } from '../types'
+import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 
 interface FactCheckResult {
   verified: boolean
@@ -72,10 +73,31 @@ export default function HostSession() {
     lastDifficulty: string
   } | null>(null)
   const [generatingBatch, setGeneratingBatch] = useState(false)
+
+  // Host-as-player state
+  const hostAnswerRef = useRef<number | null>(null)
+  const hostAnswerLockedRef = useRef(false)
+  const [hostSelectedAnswer, setHostSelectedAnswer] = useState<number | null>(null)
+  const [hostAnswerLocked, setHostAnswerLocked] = useState(false)
+  const hostQuestionShownAtRef = useRef(Date.now())
+
+  // Host controls and presentation
+  const [hostControlsMode, setHostControlsMode] = useState<'hidden' | 'compact' | 'full'>('full')
+  const [presentationMode, setPresentationMode] = useState(false)
+  const [holdUnlockActive, setHoldUnlockActive] = useState(false)
+  const holdUnlockTimerRef = useRef<number | null>(null)
+  const [controlsOpen, setControlsOpen] = useState(false)
   
   const hostToken = sessionStorage.getItem(`host_${code}`)
+  const hostRole = code ? sessionStorage.getItem(`host_role_${code}`) : null
+  const hostPlayerId = code ? sessionStorage.getItem(`host_player_${code}`) : null
+  const hostPlayerName = code ? sessionStorage.getItem(`host_player_name_${code}`) : null
+  const isHostPlayer = Boolean(hostPlayerId && hostRole !== 'host_only')
   const authToken = localStorage.getItem('quiz_auth_token') || ''
   const api = new ApiClient(config.apiBaseUrl)
+
+  const shouldGuard = Boolean(session && code && hostToken)
+  useSessionLeaveGuard(shouldGuard, 'You have an active session. Leaving will end your participation. Continue?')
 
   // Load dynamic mode config on mount
   useEffect(() => {
@@ -91,6 +113,20 @@ export default function HostSession() {
       }
     }
   }, [code])
+
+  useEffect(() => {
+    if (!code) return
+    const savedMode = localStorage.getItem(`host_controls_${code}`)
+    if (savedMode === 'hidden' || savedMode === 'compact' || savedMode === 'full') {
+      setHostControlsMode(savedMode)
+    } else {
+      setHostControlsMode(isHostPlayer ? 'hidden' : 'full')
+    }
+
+    const savedPresentation = localStorage.getItem(`presentation_${code}`)
+    setPresentationMode(savedPresentation === 'true')
+    setControlsOpen(!isHostPlayer)
+  }, [code, isHostPlayer])
 
   useEffect(() => {
     if (!code || !hostToken) {
@@ -145,14 +181,30 @@ export default function HostSession() {
           // Reset answer status and stats for new question
           setAnswerStatus({ answered: [], waiting: [] })
           setQuestionStats(null)
+          if (isHostPlayer) {
+            updateHostSelectedAnswer(null)
+            updateHostAnswerLocked(false)
+            hostQuestionShownAtRef.current = Date.now()
+          }
           break
         case 'revealed':
           setSession(prev => prev ? { ...prev, status: 'revealed' } : null)
           setResults(msg.results)
           setTimerRemaining(null)
+          if (isHostPlayer) {
+            updateHostAnswerLocked(true)
+          }
           break
         case 'timer_tick':
           setTimerRemaining(msg.remaining)
+          if (
+            isHostPlayer &&
+            msg.remaining === 0 &&
+            !hostAnswerLockedRef.current &&
+            hostAnswerRef.current !== null
+          ) {
+            void submitHostAnswer()
+          }
           break
         case 'leaderboard_update':
           setLeaderboard(msg.leaderboard)
@@ -234,6 +286,75 @@ export default function HostSession() {
       loadChallenges()
     }
   }, [session?.status])
+
+  useEffect(() => {
+    if (!isHostPlayer || !session || !hostPlayerId) return
+    if (session.status !== 'playing') return
+    const hostEntry = session.players.find(p => p.id === hostPlayerId)
+    const hasAnswered = Boolean(hostEntry && hostEntry.answers[session.currentQuestionIndex] !== undefined)
+    if (hasAnswered) {
+      updateHostAnswerLocked(true)
+    }
+  }, [isHostPlayer, session, hostPlayerId])
+
+  const updateHostSelectedAnswer = (value: number | null) => {
+    hostAnswerRef.current = value
+    setHostSelectedAnswer(value)
+  }
+
+  const updateHostAnswerLocked = (value: boolean) => {
+    hostAnswerLockedRef.current = value
+    setHostAnswerLocked(value)
+  }
+
+  const setControlsMode = (mode: 'hidden' | 'compact' | 'full') => {
+    setHostControlsMode(mode)
+    if (code) {
+      localStorage.setItem(`host_controls_${code}`, mode)
+    }
+  }
+
+  const setPresentation = (value: boolean) => {
+    setPresentationMode(value)
+    if (code) {
+      localStorage.setItem(`presentation_${code}`, String(value))
+    }
+  }
+
+  const submitHostAnswer = async () => {
+    if (!code || !hostPlayerId || !session || hostAnswerRef.current === null) return
+    updateHostAnswerLocked(true)
+    const responseTimeMs = Date.now() - hostQuestionShownAtRef.current
+    try {
+      await api.submitAnswer(code, hostPlayerId, session.currentQuestionIndex, hostAnswerRef.current, responseTimeMs)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to submit answer')
+      updateHostAnswerLocked(false)
+    }
+  }
+
+  const handleHostSelectAnswer = (choice: number) => {
+    if (hostAnswerLockedRef.current) return
+    if (session?.settings?.timerMode && timerRemaining === 0) return
+    updateHostSelectedAnswer(choice)
+  }
+
+  const startHoldUnlock = () => {
+    if (holdUnlockTimerRef.current || !code) return
+    setHoldUnlockActive(true)
+    holdUnlockTimerRef.current = window.setTimeout(() => {
+      setHoldUnlockActive(false)
+      holdUnlockTimerRef.current = null
+      setControlsMode('full')
+    }, 900)
+  }
+
+  const endHoldUnlock = () => {
+    if (!holdUnlockTimerRef.current) return
+    window.clearTimeout(holdUnlockTimerRef.current)
+    holdUnlockTimerRef.current = null
+    setHoldUnlockActive(false)
+  }
 
   const handleStart = async () => {
     if (!code || !hostToken) return
@@ -492,19 +613,90 @@ export default function HostSession() {
   const answeredCount = session.players.filter(p => 
     p.answers[session.currentQuestionIndex] !== undefined
   ).length
+  const showAdmin = hostControlsMode !== 'hidden' && !presentationMode
+  const showFullAdmin = hostControlsMode === 'full' && !presentationMode
+  const hostDisplayName = hostPlayerName || 'Host'
 
   return (
-    <div className="min-h-screen p-4 max-w-2xl mx-auto">
+    <div className={`min-h-screen p-4 mx-auto ${presentationMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <Link to="/" className="text-white/60 hover:text-white text-sm">← Home</Link>
           <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
+          {isHostPlayer && (
+            <p className="text-white/60 text-sm">Playing as {hostDisplayName}</p>
+          )}
         </div>
         <div className="text-right">
           <span className="text-white/60 text-sm">Players</span>
           <p className="text-2xl font-bold">{session.players.length}</p>
         </div>
+      </div>
+
+      {/* Host Controls Drawer */}
+      <div className="mb-4 rounded-2xl border border-white/10 bg-white/5">
+        <button
+          onClick={() => setControlsOpen(prev => !prev)}
+          className="w-full px-4 py-3 flex items-center justify-between text-left"
+        >
+          <span className="font-semibold">Host Controls</span>
+          <span className="text-white/60">{controlsOpen ? '▲' : '▼'}</span>
+        </button>
+        {controlsOpen && (
+          <div className="border-t border-white/10 px-4 py-3 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setControlsMode('hidden')}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  hostControlsMode === 'hidden'
+                    ? 'bg-white/20 border-white/30'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                Hidden
+              </button>
+              <button
+                onClick={() => setControlsMode('compact')}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  hostControlsMode === 'compact'
+                    ? 'bg-white/20 border-white/30'
+                    : 'bg-white/5 border-white/10 hover:bg-white/10'
+                }`}
+              >
+                Compact
+              </button>
+              <button
+                onMouseDown={startHoldUnlock}
+                onMouseUp={endHoldUnlock}
+                onMouseLeave={endHoldUnlock}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') startHoldUnlock()
+                }}
+                onKeyUp={endHoldUnlock}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  hostControlsMode === 'full'
+                    ? 'bg-white/20 border-white/30'
+                    : 'bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20'
+                }`}
+                aria-label="Hold to unlock full controls"
+              >
+                {hostControlsMode === 'full' ? 'Full' : holdUnlockActive ? 'Hold…' : 'Hold for Full'}
+              </button>
+            </div>
+            <div className="flex items-center justify-between rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+              <div>
+                <p className="font-medium">Presentation Mode</p>
+                <p className="text-xs text-white/50">Hide admin elements and enlarge questions</p>
+              </div>
+              <input
+                type="checkbox"
+                checked={presentationMode}
+                onChange={(e) => setPresentation(e.target.checked)}
+                className="h-5 w-5 accent-primary"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Connection mode indicator */}
@@ -555,13 +747,15 @@ export default function HostSession() {
             )}
           </div>
 
-          <button
-            onClick={handleStart}
-            disabled={loading || session.players.length === 0}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Starting...' : 'Start Round'}
-          </button>
+          {showAdmin && (
+            <button
+              onClick={handleStart}
+              disabled={loading || session.players.length === 0}
+              className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? 'Starting...' : 'Start Round'}
+            </button>
+          )}
         </div>
       )}
 
@@ -613,7 +807,7 @@ export default function HostSession() {
 
           {/* Question */}
           <div className="bg-white/10 rounded-2xl p-6">
-            <h2 className="text-xl md:text-2xl font-bold mb-6">
+            <h2 className={`${presentationMode ? 'text-3xl md:text-4xl' : 'text-xl md:text-2xl'} font-bold mb-6`}>
               {currentQuestion.question}
             </h2>
             
@@ -630,133 +824,185 @@ export default function HostSession() {
             </div>
           </div>
 
-          {/* Live Answer Distribution - Host View */}
-          <div className="bg-white/5 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setShowLiveStats(!showLiveStats)}
-              className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
-            >
-              <span className="font-medium">📊 Live Answer Distribution</span>
-              <span className="text-white/60">{showLiveStats ? '▲' : '▼'}</span>
-            </button>
-            
-            {showLiveStats && (
-              <div className="p-4 border-t border-white/10 space-y-3">
-                {currentQuestion.options.map((opt, i) => {
-                  const count = questionStats?.distribution[i] || 0
-                  const percentage = questionStats && questionStats.answeredCount > 0
-                    ? (count / questionStats.answeredCount) * 100
-                    : 0
-                  
-                  const optionColors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500']
-                  
-                  return (
-                    <div key={i} className="space-y-1">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="truncate flex-1 mr-2">
-                          <span className="font-bold">{String.fromCharCode(65 + i)}.</span> {opt}
-                        </span>
-                        <span className="font-mono text-white/60">{count}</span>
-                      </div>
-                      <div className="h-6 bg-white/10 rounded-lg overflow-hidden">
-                        <div 
-                          className={`h-full ${optionColors[i]} transition-all duration-500 flex items-center justify-end pr-2`}
-                          style={{ width: `${Math.max(percentage, 0)}%` }}
-                        >
-                          {percentage > 10 && (
-                            <span className="text-xs font-bold text-white/90">
-                              {percentage.toFixed(0)}%
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* Answer Status - Enhanced */}
-          <div className="bg-white/5 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-white/60">
-                <span className="text-2xl font-bold text-primary">{answeredCount}</span>
-                <span className="mx-1">/</span>
-                <span>{session.players.length}</span>
-                <span className="ml-2">answered</span>
-              </p>
-              <button
-                onClick={() => setShowAnswerDetails(!showAnswerDetails)}
-                className="text-sm text-white/60 hover:text-white underline"
-              >
-                {showAnswerDetails ? 'Hide' : 'Show'} details
-              </button>
-            </div>
-            
-            {showAnswerDetails && (
-              <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-4">
+          {/* Host Player Answer Panel */}
+          {isHostPlayer && !presentationMode && (
+            <div className="bg-white/10 rounded-2xl p-4">
+              <div className="flex items-center justify-between mb-3">
                 <div>
-                  <p className="text-green-400 text-sm font-medium mb-2">✓ Answered ({answerStatus.answered.length})</p>
-                  <div className="flex flex-wrap gap-1">
-                    {session.players
-                      .filter(p => p.answers[session.currentQuestionIndex] !== undefined || answerStatus.answered.includes(p.id))
-                      .map(p => (
-                        <span key={p.id} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs">
-                          {p.nickname}
-                        </span>
-                      ))}
-                  </div>
+                  <p className="text-sm text-white/60">Your Answer</p>
+                  <p className="font-semibold">{hostDisplayName}</p>
                 </div>
-                <div>
-                  <p className="text-yellow-400 text-sm font-medium mb-2">⏳ Waiting ({session.players.length - answeredCount})</p>
-                  <div className="flex flex-wrap gap-1">
-                    {session.players
-                      .filter(p => p.answers[session.currentQuestionIndex] === undefined && !answerStatus.answered.includes(p.id))
-                      .map(p => (
-                        <span key={p.id} className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 rounded text-xs">
-                          {p.nickname}
-                        </span>
-                      ))}
-                  </div>
+                <div className="text-sm text-white/60">
+                  {hostAnswerLocked ? 'Answer locked' : 'Select and confirm'}
                 </div>
               </div>
-            )}
-          </div>
-
-          {/* Live Leaderboard Toggle */}
-          <div className="bg-white/5 rounded-xl overflow-hidden">
-            <button
-              onClick={() => setShowLeaderboard(!showLeaderboard)}
-              className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
-            >
-              <span className="font-medium">📊 Live Leaderboard</span>
-              <span className="text-white/60">{showLeaderboard ? '▲' : '▼'}</span>
-            </button>
-            
-            {showLeaderboard && leaderboard.length > 0 && (
-              <div className="border-t border-white/10">
-                {leaderboard.slice(0, 5).map((entry, i) => (
-                  <div key={entry.id} className={`flex items-center p-3 ${i > 0 ? 'border-t border-white/10' : ''}`}>
-                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
-                      i === 0 ? 'bg-yellow-500 text-black' :
-                      i === 1 ? 'bg-gray-300 text-black' :
-                      i === 2 ? 'bg-amber-700 text-white' :
-                      'bg-white/20'
-                    }`}>
-                      {entry.rank}
-                    </span>
-                    <span className="flex-1 truncate">{entry.nickname}</span>
-                    <span className="text-sm text-white/60 mr-2">{entry.correctAnswers}/{entry.totalAnswers}</span>
-                    <span className="font-bold text-primary">{entry.score}</span>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {currentQuestion.options.map((opt, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleHostSelectAnswer(i)}
+                    disabled={hostAnswerLocked || (session.settings?.timerMode && timerRemaining === 0)}
+                    className={`px-3 py-3 rounded-xl border text-left transition-all ${
+                      hostSelectedAnswer === i
+                        ? 'bg-primary/30 border-primary/60'
+                        : 'bg-white/5 border-white/10 hover:bg-white/10'
+                    } ${hostAnswerLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                  >
+                    <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
+                    {opt}
+                  </button>
                 ))}
               </div>
-            )}
-          </div>
+              <div className="mt-3 flex items-center justify-between">
+                {session.settings?.timerMode && timerRemaining === 0 && !hostAnswerLocked && (
+                  <span className="text-sm text-red-300">Time's up</span>
+                )}
+                <button
+                  type="button"
+                  onClick={submitHostAnswer}
+                  disabled={hostAnswerLocked || hostSelectedAnswer === null}
+                  className="ml-auto px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-sm font-semibold hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {hostAnswerLocked ? 'Locked' : 'Lock Answer'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Live Answer Distribution - Host View */}
+          {showFullAdmin && (
+            <div className="bg-white/5 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowLiveStats(!showLiveStats)}
+                className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+              >
+                <span className="font-medium">📊 Live Answer Distribution</span>
+                <span className="text-white/60">{showLiveStats ? '▲' : '▼'}</span>
+              </button>
+              
+              {showLiveStats && (
+                <div className="p-4 border-t border-white/10 space-y-3">
+                  {currentQuestion.options.map((opt, i) => {
+                    const count = questionStats?.distribution[i] || 0
+                    const percentage = questionStats && questionStats.answeredCount > 0
+                      ? (count / questionStats.answeredCount) * 100
+                      : 0
+                    
+                    const optionColors = ['bg-red-500', 'bg-blue-500', 'bg-yellow-500', 'bg-green-500']
+                    
+                    return (
+                      <div key={i} className="space-y-1">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="truncate flex-1 mr-2">
+                            <span className="font-bold">{String.fromCharCode(65 + i)}.</span> {opt}
+                          </span>
+                          <span className="font-mono text-white/60">{count}</span>
+                        </div>
+                        <div className="h-6 bg-white/10 rounded-lg overflow-hidden">
+                          <div 
+                            className={`h-full ${optionColors[i]} transition-all duration-500 flex items-center justify-end pr-2`}
+                            style={{ width: `${Math.max(percentage, 0)}%` }}
+                          >
+                            {percentage > 10 && (
+                              <span className="text-xs font-bold text-white/90">
+                                {percentage.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Answer Status - Enhanced */}
+          {showFullAdmin && (
+            <div className="bg-white/5 rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-white/60">
+                  <span className="text-2xl font-bold text-primary">{answeredCount}</span>
+                  <span className="mx-1">/</span>
+                  <span>{session.players.length}</span>
+                  <span className="ml-2">answered</span>
+                </p>
+                <button
+                  onClick={() => setShowAnswerDetails(!showAnswerDetails)}
+                  className="text-sm text-white/60 hover:text-white underline"
+                >
+                  {showAnswerDetails ? 'Hide' : 'Show'} details
+                </button>
+              </div>
+              
+              {showAnswerDetails && (
+                <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-green-400 text-sm font-medium mb-2">✓ Answered ({answerStatus.answered.length})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {session.players
+                        .filter(p => p.answers[session.currentQuestionIndex] !== undefined || answerStatus.answered.includes(p.id))
+                        .map(p => (
+                          <span key={p.id} className="px-2 py-0.5 bg-green-500/20 text-green-300 rounded text-xs">
+                            {p.nickname}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-yellow-400 text-sm font-medium mb-2">⏳ Waiting ({session.players.length - answeredCount})</p>
+                    <div className="flex flex-wrap gap-1">
+                      {session.players
+                        .filter(p => p.answers[session.currentQuestionIndex] === undefined && !answerStatus.answered.includes(p.id))
+                        .map(p => (
+                          <span key={p.id} className="px-2 py-0.5 bg-yellow-500/20 text-yellow-300 rounded text-xs">
+                            {p.nickname}
+                          </span>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Live Leaderboard Toggle */}
+          {showFullAdmin && (
+            <div className="bg-white/5 rounded-xl overflow-hidden">
+              <button
+                onClick={() => setShowLeaderboard(!showLeaderboard)}
+                className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
+              >
+                <span className="font-medium">📊 Live Leaderboard</span>
+                <span className="text-white/60">{showLeaderboard ? '▲' : '▼'}</span>
+              </button>
+              
+              {showLeaderboard && leaderboard.length > 0 && (
+                <div className="border-t border-white/10">
+                  {leaderboard.slice(0, 5).map((entry, i) => (
+                    <div key={entry.id} className={`flex items-center p-3 ${i > 0 ? 'border-t border-white/10' : ''}`}>
+                      <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
+                        i === 0 ? 'bg-yellow-500 text-black' :
+                        i === 1 ? 'bg-gray-300 text-black' :
+                        i === 2 ? 'bg-amber-700 text-white' :
+                        'bg-white/20'
+                      }`}>
+                        {entry.rank}
+                      </span>
+                      <span className="flex-1 truncate">{entry.nickname}</span>
+                      <span className="text-sm text-white/60 mr-2">{entry.correctAnswers}/{entry.totalAnswers}</span>
+                      <span className="font-bold text-primary">{entry.score}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Controls - hide manual controls if timer mode is active */}
-          {!session.settings?.timerMode && (
+          {showAdmin && !session.settings?.timerMode && (
             <div className="flex gap-4">
               {!isLastQuestion ? (
                 <button
@@ -789,7 +1035,7 @@ export default function HostSession() {
           )}
 
           {/* Manual override in timer mode */}
-          {session.settings?.timerMode && (
+          {showAdmin && session.settings?.timerMode && (
             <div className="flex gap-4">
               <button
                 onClick={handleNext}
@@ -860,294 +1106,298 @@ export default function HostSession() {
             </Link>
           </div>
 
-          {/* Questions Review */}
-          <div className="space-y-4">
-            <h3 className="text-xl font-bold">Questions Review</h3>
-            {results.questions.map((q, i) => (
-              <div key={i} className="bg-white/5 rounded-xl p-4">
-                <p className="font-medium mb-2">
-                  <span className="text-white/60 mr-2">Q{i + 1}.</span>
-                  {q.question}
-                </p>
-                <p className="text-green-400 text-sm mb-1">
-                  ✓ {String.fromCharCode(65 + q.correct)}. {q.options[q.correct]}
-                </p>
-                {q.explanation && (
-                  <p className="text-white/60 text-sm mt-2 italic">
-                    💡 {q.explanation}
-                  </p>
-                )}
-                
-                {/* Fact-Check Section */}
-                <div className="mt-3 pt-3 border-t border-white/10">
-                  {factCheckResults[i] ? (
-                    <div className={`p-3 rounded-lg ${
-                      factCheckResults[i].verified 
-                        ? 'bg-green-500/10 border border-green-500/30' 
-                        : 'bg-yellow-500/10 border border-yellow-500/30'
-                    }`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span>{factCheckResults[i].verified ? '✅' : '⚠️'}</span>
-                        <span className={`font-medium ${factCheckResults[i].verified ? 'text-green-400' : 'text-yellow-400'}`}>
-                          {factCheckResults[i].verified ? 'Verified' : 'Uncertain'}
-                        </span>
-                        <span className="text-white/40 text-xs">
-                          ({Math.round(factCheckResults[i].confidence * 100)}% confidence)
-                        </span>
-                      </div>
-                      <p className="text-white/70 text-sm">{factCheckResults[i].explanation}</p>
-                      {factCheckResults[i].source_hint && (
-                        <p className="text-white/40 text-xs mt-1">📚 {factCheckResults[i].source_hint}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleFactCheck(i, q.question, q.options[q.correct], q.options)}
-                      disabled={factCheckLoading === i}
-                      className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center gap-2"
-                    >
-                      {factCheckLoading === i ? (
-                        <>
-                          <span className="animate-spin">⏳</span>
-                          Checking...
-                        </>
-                      ) : (
-                        <>
-                          <span>🔍</span>
-                          Fact-Check This Answer
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Challenges Dashboard */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xl font-bold">Challenges</h3>
-              <button
-                onClick={loadChallenges}
-                className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
-              >
-                Refresh
-              </button>
-            </div>
-
-            {challengeError && (
-              <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-sm">
-                {challengeError}
-              </div>
-            )}
-
-            {challengeLoading && (
-              <div className="text-white/60 text-sm">Loading challenges...</div>
-            )}
-
-            {!challengeLoading && challenges.length === 0 && (
-              <div className="text-white/50 text-sm">No challenges yet.</div>
-            )}
-
-            <div className="space-y-2">
-              {challenges.map((challenge) => (
-                <button
-                  key={challenge.questionIndex}
-                  onClick={() => loadChallengeDetail(challenge.questionIndex)}
-                  className={`w-full text-left p-3 rounded-xl border transition-colors ${
-                    challengeDetail?.questionIndex === challenge.questionIndex
-                      ? 'border-primary/60 bg-primary/10'
-                      : 'border-white/10 bg-white/5 hover:bg-white/10'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium truncate">
-                      Q{challenge.questionIndex + 1}. {challenge.question}
-                    </span>
-                    <span className="text-sm text-white/60">{challenge.count} challenge{challenge.count !== 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="mt-1 text-xs text-white/50">
-                    Status: {challenge.status}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {challengeDetail && (
-              <div className="bg-white/5 rounded-xl p-4 space-y-4">
-                <div>
-                  <h4 className="font-bold mb-1">
-                    Q{challengeDetail.questionIndex + 1}. {challengeDetail.question}
-                  </h4>
-                  <div className="space-y-1 text-sm">
-                    {challengeDetail.options.map((option, index) => (
-                      <div
-                        key={index}
-                        className={index === challengeDetail.correct ? 'text-green-400' : 'text-white/70'}
-                      >
-                        {String.fromCharCode(65 + index)}. {option}
-                        {index === challengeDetail.correct && ' ✓'}
-                      </div>
-                    ))}
-                  </div>
-                  {challengeDetail.explanation && (
-                    <p className="text-white/60 text-sm mt-2 italic">💡 {challengeDetail.explanation}</p>
-                  )}
-                </div>
-
-                <div>
-                  <h5 className="font-semibold mb-2">Submissions</h5>
-                  <div className="space-y-2">
-                    {challengeDetail.submissions.length === 0 ? (
-                      <p className="text-white/50 text-sm">No submissions yet.</p>
-                    ) : (
-                      challengeDetail.submissions.map((submission, idx) => (
-                        <div key={idx} className="p-2 rounded-lg bg-white/5 text-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">{submission.nickname}</span>
-                            <span className="text-white/40 text-xs">{submission.source}</span>
+          {showFullAdmin && (
+            <>
+              {/* Questions Review */}
+              <div className="space-y-4">
+                <h3 className="text-xl font-bold">Questions Review</h3>
+                {results.questions.map((q, i) => (
+                  <div key={i} className="bg-white/5 rounded-xl p-4">
+                    <p className="font-medium mb-2">
+                      <span className="text-white/60 mr-2">Q{i + 1}.</span>
+                      {q.question}
+                    </p>
+                    <p className="text-green-400 text-sm mb-1">
+                      ✓ {String.fromCharCode(65 + q.correct)}. {q.options[q.correct]}
+                    </p>
+                    {q.explanation && (
+                      <p className="text-white/60 text-sm mt-2 italic">
+                        💡 {q.explanation}
+                      </p>
+                    )}
+                    
+                    {/* Fact-Check Section */}
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      {factCheckResults[i] ? (
+                        <div className={`p-3 rounded-lg ${
+                          factCheckResults[i].verified 
+                            ? 'bg-green-500/10 border border-green-500/30' 
+                            : 'bg-yellow-500/10 border border-yellow-500/30'
+                        }`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span>{factCheckResults[i].verified ? '✅' : '⚠️'}</span>
+                            <span className={`font-medium ${factCheckResults[i].verified ? 'text-green-400' : 'text-yellow-400'}`}>
+                              {factCheckResults[i].verified ? 'Verified' : 'Uncertain'}
+                            </span>
+                            <span className="text-white/40 text-xs">
+                              ({Math.round(factCheckResults[i].confidence * 100)}% confidence)
+                            </span>
                           </div>
-                          {submission.category && (
-                            <div className="text-white/60 text-xs">Category: {submission.category}</div>
-                          )}
-                          {submission.note && (
-                            <div className="text-white/70 mt-1">{submission.note}</div>
+                          <p className="text-white/70 text-sm">{factCheckResults[i].explanation}</p>
+                          {factCheckResults[i].source_hint && (
+                            <p className="text-white/40 text-xs mt-1">📚 {factCheckResults[i].source_hint}</p>
                           )}
                         </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="font-semibold">Resolution</h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <label className="text-xs text-white/60">Status
-                      <select
-                        value={resolutionDraft.status}
-                        onChange={(e) => setResolutionDraft(prev => ({ ...prev, status: e.target.value }))}
-                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
-                      >
-                        <option value="open">Open</option>
-                        <option value="under_review">Under Review</option>
-                        <option value="resolved">Resolved</option>
-                      </select>
-                    </label>
-                    <label className="text-xs text-white/60">Verdict
-                      <select
-                        value={resolutionDraft.verdict}
-                        onChange={(e) => setResolutionDraft(prev => ({ ...prev, verdict: e.target.value }))}
-                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
-                      >
-                        <option value="">Select</option>
-                        <option value="valid">Valid</option>
-                        <option value="invalid">Invalid</option>
-                        <option value="ambiguous">Ambiguous</option>
-                      </select>
-                    </label>
-                  </div>
-                  <label className="text-xs text-white/60 block">
-                    Resolution note
-                    <textarea
-                      value={resolutionDraft.note}
-                      onChange={(e) => setResolutionDraft(prev => ({ ...prev, note: e.target.value }))}
-                      className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
-                      rows={2}
-                    />
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-white/70">
-                    <input
-                      type="checkbox"
-                      checked={resolutionDraft.publish}
-                      onChange={(e) => setResolutionDraft(prev => ({ ...prev, publish: e.target.checked }))}
-                    />
-                    Publish resolution to players
-                  </label>
-                  <button
-                    onClick={handleResolutionSave}
-                    className="px-3 py-2 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
-                  >
-                    Save Resolution
-                  </button>
-                </div>
-
-                <div className="space-y-2">
-                  <h5 className="font-semibold">AI Verification</h5>
-                  {challengeDetail.aiVerification ? (
-                    <div className="p-3 rounded-lg bg-white/5 text-sm space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Verdict: {challengeDetail.aiVerification.verdict}</span>
-                        <span className="text-white/40">{Math.round(challengeDetail.aiVerification.confidence * 100)}%</span>
-                      </div>
-                      <div className="text-white/70">{challengeDetail.aiVerification.rationale}</div>
-                      {challengeDetail.aiVerification.suggested_correction && (
-                        <div className="text-white/60">Suggested: {challengeDetail.aiVerification.suggested_correction}</div>
+                      ) : (
+                        <button
+                          onClick={() => handleFactCheck(i, q.question, q.options[q.correct], q.options)}
+                          disabled={factCheckLoading === i}
+                          className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50 flex items-center gap-2"
+                        >
+                          {factCheckLoading === i ? (
+                            <>
+                              <span className="animate-spin">⏳</span>
+                              Checking...
+                            </>
+                          ) : (
+                            <>
+                              <span>🔍</span>
+                              Fact-Check This Answer
+                            </>
+                          )}
+                        </button>
                       )}
-                      <div className="text-xs text-white/40">Published: {challengeDetail.aiVerification.published ? 'Yes' : 'No'}</div>
                     </div>
-                  ) : (
-                    <p className="text-white/50 text-sm">No AI verification yet.</p>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={handleAIVerify}
-                      disabled={aiVerificationLoading}
-                      className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
-                    >
-                      {aiVerificationLoading ? 'Requesting...' : 'Request AI Verification'}
-                    </button>
-                    <button
-                      onClick={handlePublishAI}
-                      disabled={publishAiLoading || !challengeDetail.aiVerification}
-                      className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
-                    >
-                      {publishAiLoading ? 'Publishing...' : 'Publish AI Result'}
-                    </button>
                   </div>
+                ))}
+              </div>
+
+              {/* Challenges Dashboard */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xl font-bold">Challenges</h3>
+                  <button
+                    onClick={loadChallenges}
+                    className="text-sm px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                  >
+                    Refresh
+                  </button>
                 </div>
 
+                {challengeError && (
+                  <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-sm">
+                    {challengeError}
+                  </div>
+                )}
+
+                {challengeLoading && (
+                  <div className="text-white/60 text-sm">Loading challenges...</div>
+                )}
+
+                {!challengeLoading && challenges.length === 0 && (
+                  <div className="text-white/50 text-sm">No challenges yet.</div>
+                )}
+
                 <div className="space-y-2">
-                  <h5 className="font-semibold">Scoring Reconciliation</h5>
-                  <p className="text-xs text-white/60">Apply if resolution is invalid or ambiguous.</p>
-                  <label className="text-xs text-white/60 block">
-                    Policy
-                    <select
-                      value={reconcilePolicy}
-                      onChange={(e) => setReconcilePolicy(e.target.value)}
-                      className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                  {challenges.map((challenge) => (
+                    <button
+                      key={challenge.questionIndex}
+                      onClick={() => loadChallengeDetail(challenge.questionIndex)}
+                      className={`w-full text-left p-3 rounded-xl border transition-colors ${
+                        challengeDetail?.questionIndex === challenge.questionIndex
+                          ? 'border-primary/60 bg-primary/10'
+                          : 'border-white/10 bg-white/5 hover:bg-white/10'
+                      }`}
                     >
-                      <option value="void">Void question</option>
-                      <option value="award_all">Award all</option>
-                      <option value="accept_multiple">Accept multiple answers</option>
-                    </select>
-                  </label>
-                  {reconcilePolicy === 'accept_multiple' && (
-                    <label className="text-xs text-white/60 block">
-                      Accepted answers (comma-separated indices)
-                      <input
-                        value={reconcileAnswers}
-                        onChange={(e) => setReconcileAnswers(e.target.value)}
-                        className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
-                        placeholder="e.g. 0,2"
-                      />
-                    </label>
-                  )}
-                  <button
-                    onClick={handleReconcile}
-                    className="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-sm hover:bg-amber-500/30"
-                  >
-                    Apply Reconciliation
-                  </button>
-                  {challengeDetail.reconciliation && (
-                    <div className="text-xs text-white/60">
-                      Applied policy: {challengeDetail.reconciliation.policy}
-                    </div>
-                  )}
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium truncate">
+                          Q{challenge.questionIndex + 1}. {challenge.question}
+                        </span>
+                        <span className="text-sm text-white/60">{challenge.count} challenge{challenge.count !== 1 ? 's' : ''}</span>
+                      </div>
+                      <div className="mt-1 text-xs text-white/50">
+                        Status: {challenge.status}
+                      </div>
+                    </button>
+                  ))}
                 </div>
+
+                {challengeDetail && (
+                  <div className="bg-white/5 rounded-xl p-4 space-y-4">
+                    <div>
+                      <h4 className="font-bold mb-1">
+                        Q{challengeDetail.questionIndex + 1}. {challengeDetail.question}
+                      </h4>
+                      <div className="space-y-1 text-sm">
+                        {challengeDetail.options.map((option, index) => (
+                          <div
+                            key={index}
+                            className={index === challengeDetail.correct ? 'text-green-400' : 'text-white/70'}
+                          >
+                            {String.fromCharCode(65 + index)}. {option}
+                            {index === challengeDetail.correct && ' ✓'}
+                          </div>
+                        ))}
+                      </div>
+                      {challengeDetail.explanation && (
+                        <p className="text-white/60 text-sm mt-2 italic">💡 {challengeDetail.explanation}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <h5 className="font-semibold mb-2">Submissions</h5>
+                      <div className="space-y-2">
+                        {challengeDetail.submissions.length === 0 ? (
+                          <p className="text-white/50 text-sm">No submissions yet.</p>
+                        ) : (
+                          challengeDetail.submissions.map((submission, idx) => (
+                            <div key={idx} className="p-2 rounded-lg bg-white/5 text-sm">
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium">{submission.nickname}</span>
+                                <span className="text-white/40 text-xs">{submission.source}</span>
+                              </div>
+                              {submission.category && (
+                                <div className="text-white/60 text-xs">Category: {submission.category}</div>
+                              )}
+                              {submission.note && (
+                                <div className="text-white/70 mt-1">{submission.note}</div>
+                              )}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="font-semibold">Resolution</h5>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <label className="text-xs text-white/60">Status
+                          <select
+                            value={resolutionDraft.status}
+                            onChange={(e) => setResolutionDraft(prev => ({ ...prev, status: e.target.value }))}
+                            className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                          >
+                            <option value="open">Open</option>
+                            <option value="under_review">Under Review</option>
+                            <option value="resolved">Resolved</option>
+                          </select>
+                        </label>
+                        <label className="text-xs text-white/60">Verdict
+                          <select
+                            value={resolutionDraft.verdict}
+                            onChange={(e) => setResolutionDraft(prev => ({ ...prev, verdict: e.target.value }))}
+                            className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                          >
+                            <option value="">Select</option>
+                            <option value="valid">Valid</option>
+                            <option value="invalid">Invalid</option>
+                            <option value="ambiguous">Ambiguous</option>
+                          </select>
+                        </label>
+                      </div>
+                      <label className="text-xs text-white/60 block">
+                        Resolution note
+                        <textarea
+                          value={resolutionDraft.note}
+                          onChange={(e) => setResolutionDraft(prev => ({ ...prev, note: e.target.value }))}
+                          className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                          rows={2}
+                        />
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-white/70">
+                        <input
+                          type="checkbox"
+                          checked={resolutionDraft.publish}
+                          onChange={(e) => setResolutionDraft(prev => ({ ...prev, publish: e.target.checked }))}
+                        />
+                        Publish resolution to players
+                      </label>
+                      <button
+                        onClick={handleResolutionSave}
+                        className="px-3 py-2 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
+                      >
+                        Save Resolution
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="font-semibold">AI Verification</h5>
+                      {challengeDetail.aiVerification ? (
+                        <div className="p-3 rounded-lg bg-white/5 text-sm space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium">Verdict: {challengeDetail.aiVerification.verdict}</span>
+                            <span className="text-white/40">{Math.round(challengeDetail.aiVerification.confidence * 100)}%</span>
+                          </div>
+                          <div className="text-white/70">{challengeDetail.aiVerification.rationale}</div>
+                          {challengeDetail.aiVerification.suggested_correction && (
+                            <div className="text-white/60">Suggested: {challengeDetail.aiVerification.suggested_correction}</div>
+                          )}
+                          <div className="text-xs text-white/40">Published: {challengeDetail.aiVerification.published ? 'Yes' : 'No'}</div>
+                        </div>
+                      ) : (
+                        <p className="text-white/50 text-sm">No AI verification yet.</p>
+                      )}
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={handleAIVerify}
+                          disabled={aiVerificationLoading}
+                          className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                        >
+                          {aiVerificationLoading ? 'Requesting...' : 'Request AI Verification'}
+                        </button>
+                        <button
+                          onClick={handlePublishAI}
+                          disabled={publishAiLoading || !challengeDetail.aiVerification}
+                          className="px-3 py-2 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20 disabled:opacity-50"
+                        >
+                          {publishAiLoading ? 'Publishing...' : 'Publish AI Result'}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="font-semibold">Scoring Reconciliation</h5>
+                      <p className="text-xs text-white/60">Apply if resolution is invalid or ambiguous.</p>
+                      <label className="text-xs text-white/60 block">
+                        Policy
+                        <select
+                          value={reconcilePolicy}
+                          onChange={(e) => setReconcilePolicy(e.target.value)}
+                          className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                        >
+                          <option value="void">Void question</option>
+                          <option value="award_all">Award all</option>
+                          <option value="accept_multiple">Accept multiple answers</option>
+                        </select>
+                      </label>
+                      {reconcilePolicy === 'accept_multiple' && (
+                        <label className="text-xs text-white/60 block">
+                          Accepted answers (comma-separated indices)
+                          <input
+                            value={reconcileAnswers}
+                            onChange={(e) => setReconcileAnswers(e.target.value)}
+                            className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                            placeholder="e.g. 0,2"
+                          />
+                        </label>
+                      )}
+                      <button
+                        onClick={handleReconcile}
+                        className="px-3 py-2 rounded-lg bg-amber-500/20 border border-amber-500/40 text-sm hover:bg-amber-500/30"
+                      >
+                        Apply Reconciliation
+                      </button>
+                      {challengeDetail.reconciliation && (
+                        <div className="text-xs text-white/60">
+                          Applied policy: {challengeDetail.reconciliation.policy}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
     </div>

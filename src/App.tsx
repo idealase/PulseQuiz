@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { ConfigProvider } from './context/ConfigContext'
+import GlobalNav from './components/GlobalNav'
 import Landing from './pages/Landing'
 import HostCreate from './pages/HostCreate'
 import HostSession from './pages/HostSession'
@@ -8,11 +9,13 @@ import PlayerSession from './pages/PlayerSession'
 import AudienceJoin from './pages/AudienceJoin'
 import AudienceSession from './pages/AudienceSession'
 import SoloPlay from './pages/SoloPlay'
+import Settings from './pages/Settings'
 
 function App() {
   return (
     <ConfigProvider>
       <div className="min-h-screen text-white">
+        <GlobalNav />
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/solo" element={<SoloPlay />} />
@@ -24,6 +27,7 @@ function App() {
           <Route path="/watch" element={<AudienceJoin />} />
           <Route path="/watch/:code" element={<AudienceJoin />} />
           <Route path="/audience/:code" element={<AudienceSession />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </ConfigProvider>
