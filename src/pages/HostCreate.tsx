@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
+import { useTheme } from '../context/ThemeContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
@@ -11,6 +12,7 @@ import { setLastSession } from '../utils/sessionResume'
 export default function HostCreate() {
   const config = useConfig()
   const navigate = useNavigate()
+  const { applyTheme, lockTheme, intensity } = useTheme()
   
   const [sessionCode, setSessionCode] = useState<string | null>(null)
   const [hostToken, setHostToken] = useState<string | null>(null)
@@ -182,6 +184,18 @@ export default function HostCreate() {
       
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
+
+      if (!lockTheme) {
+        try {
+          const themeResult = await api.generateTheme({
+            topic: aiTopics,
+            intensity
+          }, aiAuthToken)
+          applyTheme(themeResult.theme)
+        } catch (themeError) {
+          console.warn('Theme generation failed', themeError)
+        }
+      }
       
       if (dynamicEnabled) {
         setCsvErrors([`Dynamic Mode: Generated initial batch of ${result.questions.length} questions (requested: ${initialBatchSize}). Target: ${aiQuestionCount} total. More will be generated during gameplay.`])

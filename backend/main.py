@@ -21,6 +21,19 @@ from models import (
     LiveLeaderboardEntry, QuestionStats, AnswerStatus,
     generate_session_code, generate_token, generate_player_id
 )
+from theme_spec import (
+    ThemeSpec,
+    FONT_STACKS,
+    THEME_LIBRARY,
+    DEFAULT_THEME_ID,
+    analyze_topic,
+    apply_deltas,
+    apply_intensity,
+    get_theme_by_id,
+    is_sensitive_topic,
+    select_theme_base,
+    validate_theme_spec,
+)
 from logger import (
     setup_logging, get_logger, get_copilot_logger,
     CopilotCallTracker, summarize_token_usage,
@@ -176,6 +189,17 @@ class FactCheckResponse(BaseModel):
     source_hint: Optional[str] = None
 
 
+class GenerateThemeRequest(BaseModel):
+    topic: str
+    intensity: str = Field(default="subtle", description="subtle or strong")
+
+
+class GenerateThemeResponse(BaseModel):
+    theme: ThemeSpec
+    fallback: bool = False
+    issues: Optional[List[str]] = None
+
+
 # --- AI Generation Helper Functions ---
 
 # Auth secret for AI endpoints (simple shared secret)
@@ -212,6 +236,54 @@ OUTPUT FORMAT - Return ONLY valid JSON (no markdown, no explanation):
 }
 
 The "correct" field is the 0-based index of the correct answer (0=A, 1=B, 2=C, 3=D)."""
+
+THEME_SYSTEM_PROMPT = """You are a UI theme planner. Return ONLY JSON with theme_id and deltas.
+
+Output format:
+{
+    "theme_id": "<id>",
+    "deltas": {
+        "palette": {
+            "background": "#RRGGBB",
+            "surface": "#RRGGBB",
+            "text": "#RRGGBB",
+            "accent": "#RRGGBB",
+            "accent2": "#RRGGBB",
+            "border": "#RRGGBB"
+        },
+        "typography": {
+            "fontFamily": "<whitelist>",
+            "weights": {"base": 400, "strong": 700}
+        },
+        "density": "compact|comfortable",
+        "components": {"button": "flat|outlined|filled", "card": "bordered|shadowed", "table": "minimal|grid"},
+        "motion": "none|subtle|active",
+        "motifs": "snow|scanlines|confetti|pumpkin"
+    }
+}
+
+Rules:
+- No raw CSS.
+- Only use hex colors and whitelisted token values.
+- Omit fields in deltas when no change is needed.
+"""
+
+THEME_REPAIR_PROMPT = """You are a UI theme fixer. Return ONLY JSON for a full ThemeSpec.
+
+Schema:
+{
+    "palette": {"background": "#RRGGBB", "surface": "#RRGGBB", "text": "#RRGGBB", "accent": "#RRGGBB", "accent2": "#RRGGBB", "border": "#RRGGBB"},
+    "typography": {"fontFamily": "<whitelist>", "weights": {"base": 400, "strong": 700}, "scale": {"sm": 0.9, "base": 1.0, "lg": 1.1, "xl": 1.3}},
+    "density": "compact|comfortable",
+    "components": {"button": "flat|outlined|filled", "card": "bordered|shadowed", "table": "minimal|grid"},
+    "motion": "none|subtle|active",
+    "motifs": "snow|scanlines|confetti|pumpkin"
+}
+
+Rules:
+- No raw CSS.
+- Only use hex colors and whitelisted token values.
+"""
 
 
 def parse_questions_from_response(content: str) -> List[Question]:
@@ -256,6 +328,99 @@ def parse_questions_from_response(content: str) -> List[Question]:
         logger.error(f"❌ JSON parse error: {e}")
         logger.error(f"   Content preview: {content[:200]}...")
         raise ValueError(f"Failed to parse questions JSON: {e}")
+
+
+def extract_json_payload(content: str) -> dict:
+    """Extract a JSON object from a model response."""
+    json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', content)
+    if json_match:
+        content = json_match.group(1).strip()
+
+    json_match = re.search(r'\{[\s\S]*\}', content)
+    if not json_match:
+        raise ValueError("No JSON object found in response")
+
+    return json.loads(json_match.group(0))
+
+
+def parse_theme_patch_from_response(content: str) -> tuple[Optional[str], dict]:
+    """Parse theme_id and deltas from a Copilot response."""
+    data = extract_json_payload(content)
+    theme_id = data.get("theme_id") or data.get("themeId")
+    deltas = data.get("deltas") or {}
+    if not isinstance(deltas, dict):
+        deltas = {}
+    if not isinstance(theme_id, str):
+        theme_id = None
+    return theme_id, deltas
+
+
+def parse_theme_spec_from_response(content: str) -> ThemeSpec:
+    """Parse a full ThemeSpec from a Copilot response."""
+    data = extract_json_payload(content)
+    return ThemeSpec.model_validate(data)
+
+
+async def generate_theme_spec(topic: str, intensity: str) -> tuple[ThemeSpec, bool, list[str]]:
+    """Generate a ThemeSpec using Copilot with validation and repair."""
+    if is_sensitive_topic(topic):
+        fallback = get_theme_by_id(DEFAULT_THEME_ID)
+        return fallback, True, ["Sensitive topic detected; using safe theme."]
+
+    vibes = analyze_topic(topic)
+    base_theme = select_theme_base(vibes)
+    base_theme = apply_intensity(base_theme, intensity)
+    issues: list[str] = []
+    fallback_used = False
+
+    theme_ids = ", ".join(sorted(THEME_LIBRARY.keys()))
+    font_keys = ", ".join(sorted(FONT_STACKS.keys()))
+    prompt = (
+        f"Topic: {topic}\n"
+        f"Vibe tags: {', '.join(vibes)}\n\n"
+        f"Choose a base theme_id from: {theme_ids}\n"
+        f"Whitelisted font keys: {font_keys}\n"
+        f"Return JSON patch only."
+    )
+
+    try:
+        content = await generate_with_copilot(prompt, system_message=THEME_SYSTEM_PROMPT, caller="generate_theme")
+        theme_id, deltas = parse_theme_patch_from_response(content)
+        selected = get_theme_by_id(theme_id) if theme_id else None
+        if selected:
+            base_theme = selected
+        base_theme = apply_deltas(base_theme, deltas)
+        base_theme = apply_intensity(base_theme, intensity)
+        issues = validate_theme_spec(base_theme)
+    except Exception as e:
+        logger.warning(f"Theme generation failed, falling back to base theme: {e}")
+        issues = ["Theme generation failed; using base theme."]
+
+    if issues:
+        try:
+            repair_prompt = (
+                f"Fix the following theme issues: {issues}\n\n"
+                f"Current theme: {base_theme.model_dump(by_alias=True)}"
+            )
+            repaired_content = await generate_with_copilot(
+                repair_prompt,
+                system_message=THEME_REPAIR_PROMPT,
+                caller="repair_theme",
+            )
+            repaired_theme = parse_theme_spec_from_response(repaired_content)
+            repaired_theme = apply_intensity(repaired_theme, intensity)
+            repair_issues = validate_theme_spec(repaired_theme)
+            if not repair_issues:
+                return repaired_theme, False, []
+            issues = repair_issues
+        except Exception as e:
+            issues.append(f"Repair failed: {e}")
+
+        fallback = get_theme_by_id(DEFAULT_THEME_ID)
+        fallback_used = True
+        return fallback, fallback_used, issues
+
+    return base_theme, fallback_used, issues
 
 
 def find_copilot_cli() -> Optional[str]:
@@ -1399,6 +1564,34 @@ async def test_ai_connection():
         logger.error(f"   ✗ Error: {e}")
     
     return result
+
+
+@app.post("/api/generate-theme", response_model=GenerateThemeResponse, response_model_by_alias=True)
+async def generate_theme(
+    request: GenerateThemeRequest,
+    x_auth_token: str = Header(default="")
+):
+    """Generate a validated ThemeSpec for a topic."""
+    if not verify_auth_token(x_auth_token):
+        raise HTTPException(status_code=401, detail="Unauthorized - invalid auth token")
+
+    topic = request.topic.strip()
+    if not topic:
+        raise HTTPException(status_code=400, detail="Topic cannot be empty")
+    if len(topic) > 200:
+        raise HTTPException(status_code=400, detail="Topic too long (max 200 characters)")
+
+    intensity = request.intensity.strip().lower()
+    if intensity not in ["subtle", "strong"]:
+        intensity = "subtle"
+
+    try:
+        theme, fallback, issues = await generate_theme_spec(topic, intensity)
+        return GenerateThemeResponse(theme=theme, fallback=fallback, issues=issues or None)
+    except Exception as e:
+        logger.error(f"Theme generation failed: {e}")
+        fallback_theme = get_theme_by_id(DEFAULT_THEME_ID)
+        return GenerateThemeResponse(theme=fallback_theme, fallback=True, issues=[str(e)])
 
 
 @app.post("/api/generate-questions", response_model=GenerateQuestionsResponse)

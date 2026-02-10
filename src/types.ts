@@ -6,6 +6,53 @@ export interface Question {
   points: number
 }
 
+export type ThemeDensity = 'compact' | 'comfortable'
+export type ThemeMotion = 'none' | 'subtle' | 'active'
+export type ThemeMotif = 'snow' | 'scanlines' | 'confetti' | 'pumpkin'
+export type ThemeButtonStyle = 'flat' | 'outlined' | 'filled'
+export type ThemeCardStyle = 'bordered' | 'shadowed'
+export type ThemeTableStyle = 'minimal' | 'grid'
+export type ThemeIntensity = 'subtle' | 'strong'
+
+export interface ThemePalette {
+  background: string
+  surface: string
+  text: string
+  accent: string
+  accent2: string
+  border: string
+}
+
+export interface ThemeTypography {
+  fontFamily: string
+  weights: {
+    base: number
+    strong: number
+  }
+  scale: {
+    sm: number
+    base: number
+    lg: number
+    xl: number
+  }
+}
+
+export interface ThemeComponents {
+  button: ThemeButtonStyle
+  card: ThemeCardStyle
+  table: ThemeTableStyle
+}
+
+export interface ThemeSpec {
+  palette: ThemePalette
+  typography: ThemeTypography
+  density: ThemeDensity
+  components: ThemeComponents
+  motion: ThemeMotion
+  motifs?: ThemeMotif | null
+  themeId?: string
+}
+
 export interface Player {
   id: string
   nickname: string

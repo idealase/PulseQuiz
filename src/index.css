@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --pq-background: #1e1b4b;
+  --pq-surface: #312e81;
+  --pq-text: #f8fafc;
+  --pq-border: #4338ca;
+  --pq-accent: 99 102 241;
+  --pq-accent-2: 34 211 238;
+  --pq-surface-05: rgba(49, 46, 129, 0.05);
+  --pq-surface-10: rgba(49, 46, 129, 0.1);
+  --pq-surface-15: rgba(49, 46, 129, 0.15);
+  --pq-surface-20: rgba(49, 46, 129, 0.2);
+  --pq-border-10: rgba(67, 56, 202, 0.1);
+  --pq-border-20: rgba(67, 56, 202, 0.2);
+  --pq-border-30: rgba(67, 56, 202, 0.3);
+  --pq-text-40: rgba(248, 250, 252, 0.4);
+  --pq-text-50: rgba(248, 250, 252, 0.5);
+  --pq-text-60: rgba(248, 250, 252, 0.6);
+  --pq-text-80: rgba(248, 250, 252, 0.8);
+  --pq-accent-glow-50: rgba(99, 102, 241, 0.5);
+  --pq-accent-glow-80: rgba(99, 102, 241, 0.8);
+  --pq-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -13,9 +36,64 @@ html, body, #root {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #1e1b4b 100%);
+  font-family: var(--pq-font-family);
+  background: var(--pq-background);
+  color: var(--pq-text);
   min-height: 100vh;
+}
+
+#root {
+  position: relative;
+  z-index: 1;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+body[data-motif='snow']::before {
+  opacity: 0.25;
+  background-image:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 70% 40%, rgba(255, 255, 255, 0.4) 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.3) 0 2px, transparent 3px);
+  background-size: 220px 220px;
+}
+
+body[data-motif='scanlines']::before {
+  opacity: 0.2;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.06) 0,
+    rgba(255, 255, 255, 0.06) 1px,
+    transparent 1px,
+    transparent 4px
+  );
+}
+
+body[data-motif='confetti']::before {
+  opacity: 0.22;
+  background-image:
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.6) 0 3px, transparent 4px),
+    radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 40% 70%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.4) 0 2px, transparent 3px);
+  background-size: 260px 260px;
+}
+
+body[data-motif='pumpkin']::before {
+  opacity: 0.18;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(249, 115, 22, 0.4) 0 4px, transparent 5px),
+    radial-gradient(circle at 60% 60%, rgba(249, 115, 22, 0.35) 0 4px, transparent 5px),
+    radial-gradient(circle at 80% 20%, rgba(234, 88, 12, 0.3) 0 4px, transparent 5px);
+  background-size: 240px 240px;
 }
 
 /* Mobile-first touch targets */
@@ -45,8 +123,8 @@ input, select, textarea {
 
 /* Animations */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.5); }
-  50% { box-shadow: 0 0 40px rgba(99, 102, 241, 0.8); }
+  0%, 100% { box-shadow: 0 0 20px var(--pq-accent-glow-50); }
+  50% { box-shadow: 0 0 40px var(--pq-accent-glow-80); }
 }
 
 .animate-pulse-glow {
@@ -60,4 +138,33 @@ input, select, textarea {
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out;
+}
+
+:root[data-motion='none'] .animate-pulse-glow,
+:root[data-motion='none'] .animate-slide-up {
+  animation: none !important;
+}
+
+:root[data-motion='subtle'] .animate-slide-up {
+  animation-duration: 0.45s;
+}
+
+:root[data-motion='active'] .animate-slide-up {
+  animation-duration: 0.25s;
+}
+
+@layer utilities {
+  .bg-white\/5 { background-color: var(--pq-surface-05) !important; }
+  .bg-white\/10 { background-color: var(--pq-surface-10) !important; }
+  .bg-white\/15 { background-color: var(--pq-surface-15) !important; }
+  .bg-white\/20 { background-color: var(--pq-surface-20) !important; }
+
+  .border-white\/10 { border-color: var(--pq-border-10) !important; }
+  .border-white\/20 { border-color: var(--pq-border-20) !important; }
+  .border-white\/30 { border-color: var(--pq-border-30) !important; }
+
+  .text-white\/40 { color: var(--pq-text-40) !important; }
+  .text-white\/50 { color: var(--pq-text-50) !important; }
+  .text-white\/60 { color: var(--pq-text-60) !important; }
+  .text-white\/80 { color: var(--pq-text-80) !important; }
 }

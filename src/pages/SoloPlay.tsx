@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
+import { useTheme } from '../context/ThemeContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
@@ -21,6 +22,7 @@ type DynamicConfig = {
 
 export default function SoloPlay() {
   const config = useConfig()
+  const { applyTheme, lockTheme, intensity } = useTheme()
   const api = new ApiClient(config.apiBaseUrl)
 
   // Setup phase state
@@ -219,6 +221,18 @@ export default function SoloPlay() {
       setQuestions(result.questions)
       setCsvErrors([])
       setGenerationTime(Date.now() - startTime)
+
+      if (!lockTheme) {
+        try {
+          const themeResult = await api.generateTheme({
+            topic: aiTopics.trim(),
+            intensity
+          }, aiAuthToken)
+          applyTheme(themeResult.theme)
+        } catch (themeError) {
+          console.warn('Theme generation failed', themeError)
+        }
+      }
 
       if (dynamicEnabled) {
         const sessionCode = `solo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
