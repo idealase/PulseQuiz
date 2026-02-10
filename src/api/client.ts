@@ -8,7 +8,8 @@ import {
   ChallengeDetail,
   ChallengeResolution,
   AIVerification,
-  ReconciliationPolicy
+  ReconciliationPolicy,
+  ThemeSpec
 } from '../types'
 
 interface CreateSessionRequest {
@@ -85,6 +86,17 @@ interface FactCheckResponse {
   confidence: number
   explanation: string
   source_hint?: string
+}
+
+interface GenerateThemeRequest {
+  topic: string
+  intensity?: 'subtle' | 'strong'
+}
+
+interface GenerateThemeResponse {
+  theme: ThemeSpec
+  fallback: boolean
+  issues?: string[]
 }
 
 interface FeedbackRequest {
@@ -335,6 +347,17 @@ export class ApiClient {
       method: 'POST',
       headers: { 'X-Auth-Token': authToken },
       body: JSON.stringify(request),
+    })
+  }
+
+  async generateTheme(
+    request: GenerateThemeRequest,
+    authToken: string
+  ): Promise<GenerateThemeResponse> {
+    return this.request('/api/generate-theme', {
+      method: 'POST',
+      headers: { 'X-Auth-Token': authToken },
+      body: JSON.stringify(request)
     })
   }
 

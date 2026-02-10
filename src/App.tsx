@@ -1,5 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { ConfigProvider } from './context/ConfigContext'
+import { ThemeProvider } from './context/ThemeContext'
 import GlobalNav from './components/GlobalNav'
 import Landing from './pages/Landing'
 import HostCreate from './pages/HostCreate'
@@ -14,22 +15,24 @@ import Settings from './pages/Settings'
 function App() {
   return (
     <ConfigProvider>
-      <div className="min-h-screen text-white">
-        <GlobalNav />
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/solo" element={<SoloPlay />} />
-          <Route path="/host" element={<HostCreate />} />
-          <Route path="/host/:code" element={<HostSession />} />
-          <Route path="/join" element={<PlayerJoin />} />
-          <Route path="/join/:code" element={<PlayerJoin />} />
-          <Route path="/play/:code" element={<PlayerSession />} />
-          <Route path="/watch" element={<AudienceJoin />} />
-          <Route path="/watch/:code" element={<AudienceJoin />} />
-          <Route path="/audience/:code" element={<AudienceSession />} />
-          <Route path="/settings" element={<Settings />} />
-        </Routes>
-      </div>
+      <ThemeProvider>
+        <div className="min-h-screen text-white">
+          <GlobalNav />
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/solo" element={<SoloPlay />} />
+            <Route path="/host" element={<HostCreate />} />
+            <Route path="/host/:code" element={<HostSession />} />
+            <Route path="/join" element={<PlayerJoin />} />
+            <Route path="/join/:code" element={<PlayerJoin />} />
+            <Route path="/play/:code" element={<PlayerSession />} />
+            <Route path="/watch" element={<AudienceJoin />} />
+            <Route path="/watch/:code" element={<AudienceJoin />} />
+            <Route path="/audience/:code" element={<AudienceSession />} />
+            <Route path="/settings" element={<Settings />} />
+          </Routes>
+        </div>
+      </ThemeProvider>
     </ConfigProvider>
   )
 }

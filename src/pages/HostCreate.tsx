@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
+import { useTheme } from '../context/ThemeContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
@@ -11,6 +12,7 @@ import { setLastSession } from '../utils/sessionResume'
 export default function HostCreate() {
   const config = useConfig()
   const navigate = useNavigate()
+  const { applyTheme, lockTheme, intensity, experimentalTheme } = useTheme()
   
   const [sessionCode, setSessionCode] = useState<string | null>(null)
   const [hostToken, setHostToken] = useState<string | null>(null)
@@ -40,6 +42,7 @@ export default function HostCreate() {
   const aiDynamicModeRef = useRef(false)
   const [dynamicToggleGuard, setDynamicToggleGuard] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [themeGenerating, setThemeGenerating] = useState(false)
   const [aiAuthToken, setAiAuthToken] = useState(() => localStorage.getItem('quiz_auth_token') || '')
   const [showAuthInput, setShowAuthInput] = useState(() => !localStorage.getItem('quiz_auth_token'))
   const [generationTime, setGenerationTime] = useState<number | null>(null)
@@ -182,6 +185,18 @@ export default function HostCreate() {
       
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
+
+      if (!lockTheme && experimentalTheme) {
+        try {
+          const themeResult = await api.generateTheme({
+            topic: aiTopics,
+            intensity
+          }, aiAuthToken)
+          applyTheme(themeResult.theme)
+        } catch (themeError) {
+          console.warn('Theme generation failed', themeError)
+        }
+      }
       
       if (dynamicEnabled) {
         setCsvErrors([`Dynamic Mode: Generated initial batch of ${result.questions.length} questions (requested: ${initialBatchSize}). Target: ${aiQuestionCount} total. More will be generated during gameplay.`])
@@ -197,6 +212,44 @@ export default function HostCreate() {
       }
     }
     setAiGenerating(false)
+  }
+
+  const handleThemePreview = async () => {
+    if (!aiTopics.trim()) {
+      setError('Please enter at least one topic')
+      return
+    }
+
+    if (!aiAuthToken.trim()) {
+      setShowAuthInput(true)
+      setError('Please enter your access code')
+      return
+    }
+
+    if (!experimentalTheme) {
+      setError('Enable Experimental Theme Generation in Settings')
+      return
+    }
+
+    if (lockTheme) {
+      setError('Theme is locked in Settings')
+      return
+    }
+
+    setThemeGenerating(true)
+    setError(null)
+
+    try {
+      const themeResult = await api.generateTheme({
+        topic: aiTopics,
+        intensity
+      }, aiAuthToken)
+      applyTheme(themeResult.theme)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Theme preview failed')
+    }
+
+    setThemeGenerating(false)
   }
 
   const joinUrl = sessionCode 
@@ -481,6 +534,14 @@ export default function HostCreate() {
                   <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
                 </>
               )}
+            </button>
+
+            <button
+              onClick={handleThemePreview}
+              disabled={themeGenerating || !aiTopics.trim() || lockTheme || !experimentalTheme}
+              className="w-full py-2.5 px-6 font-semibold rounded-xl border border-purple-500/50 text-purple-200 hover:bg-purple-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}
             </button>
             
             {/* Generation Stats */}
