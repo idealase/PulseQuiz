@@ -42,6 +42,7 @@ export default function HostCreate() {
   const aiDynamicModeRef = useRef(false)
   const [dynamicToggleGuard, setDynamicToggleGuard] = useState(false)
   const [aiGenerating, setAiGenerating] = useState(false)
+  const [themeGenerating, setThemeGenerating] = useState(false)
   const [aiAuthToken, setAiAuthToken] = useState(() => localStorage.getItem('quiz_auth_token') || '')
   const [showAuthInput, setShowAuthInput] = useState(() => !localStorage.getItem('quiz_auth_token'))
   const [generationTime, setGenerationTime] = useState<number | null>(null)
@@ -211,6 +212,39 @@ export default function HostCreate() {
       }
     }
     setAiGenerating(false)
+  }
+
+  const handleThemePreview = async () => {
+    if (!aiTopics.trim()) {
+      setError('Please enter at least one topic')
+      return
+    }
+
+    if (!aiAuthToken.trim()) {
+      setShowAuthInput(true)
+      setError('Please enter your access code')
+      return
+    }
+
+    if (lockTheme) {
+      setError('Theme is locked in Settings')
+      return
+    }
+
+    setThemeGenerating(true)
+    setError(null)
+
+    try {
+      const themeResult = await api.generateTheme({
+        topic: aiTopics,
+        intensity
+      }, aiAuthToken)
+      applyTheme(themeResult.theme)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Theme preview failed')
+    }
+
+    setThemeGenerating(false)
   }
 
   const joinUrl = sessionCode 
@@ -495,6 +529,14 @@ export default function HostCreate() {
                   <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
                 </>
               )}
+            </button>
+
+            <button
+              onClick={handleThemePreview}
+              disabled={themeGenerating || !aiTopics.trim() || lockTheme}
+              className="w-full py-2.5 px-6 font-semibold rounded-xl border border-purple-500/50 text-purple-200 hover:bg-purple-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}
             </button>
             
             {/* Generation Stats */}

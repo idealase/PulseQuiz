@@ -66,7 +66,6 @@ function applyThemeToDocument(theme: ThemeSpec) {
   const body = document.body
   const reduceMotion = getReduceMotionPref()
 
-  const backgroundRgb = hexToRgb(theme.palette.background) || { r: 30, g: 27, b: 75 }
   const surfaceRgb = hexToRgb(theme.palette.surface) || { r: 49, g: 46, b: 129 }
   const textRgb = hexToRgb(theme.palette.text) || { r: 248, g: 250, b: 252 }
   const borderRgb = hexToRgb(theme.palette.border) || { r: 67, g: 56, b: 202 }
