@@ -310,11 +310,14 @@ def find_copilot_cli() -> Optional[str]:
 async def generate_with_copilot(
     prompt: str,
     system_message: str = QUIZ_SYSTEM_PROMPT,
-    model: str = "gpt-4.1",
+    model: Optional[str] = None,
     caller: str = "generate_with_copilot",
 ) -> str:
     """Generate content using Copilot CLI directly (non-interactive mode)"""
-    
+
+    if not model:
+        model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-4.1")
+
     # Validate model name (basic sanity check)
     valid_models = [
         "claude-sonnet-4.5", "claude-haiku-4.5", "claude-opus-4.5", "claude-sonnet-4",

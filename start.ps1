@@ -2,14 +2,54 @@
 # Launches backend with either Cloudflare Tunnel (corporate-friendly) or ngrok
 
 param(
+    [switch]$Help,           # Show usage
     [switch]$UseNgrok,        # Use ngrok instead of Cloudflare Tunnel
     [switch]$SkipDeploy,      # Skip GitHub Pages deploy (ngrok mode only)
     [switch]$SkipBuild,       # Skip frontend build
     [switch]$CleanRefresh,    # Force clean refresh of frontend/backend dependencies
     [switch]$VerboseLogging,  # Enable verbose backend + access logs
     [int]$Port = 8000,
-    [string]$Message = ""     # Custom message to display on home page
+    [string]$Message = "",    # Custom message to display on home page
+    [string]$CopilotModel = "" # Optional: set QUIZ_COPILOT_MODEL for backend
 )
+
+if ($Help) {
+    Write-Host "PulseQuiz startup" -ForegroundColor Cyan
+    Write-Host "Usage:" -ForegroundColor White
+    Write-Host "  .\\start.ps1 [-UseNgrok] [-SkipDeploy] [-SkipBuild] [-CleanRefresh] [-VerboseLogging]" -ForegroundColor Gray
+    Write-Host "               [-Port 8000] [-Message \"...\"] [-CopilotModel <model>]" -ForegroundColor Gray
+    Write-Host "" 
+    Write-Host "Options:" -ForegroundColor White
+    Write-Host "  -Help               Show this help" -ForegroundColor Gray
+    Write-Host "  -UseNgrok            Use ngrok instead of Cloudflare Tunnel" -ForegroundColor Gray
+    Write-Host "  -SkipDeploy          Skip GitHub Pages deploy (ngrok mode only)" -ForegroundColor Gray
+    Write-Host "  -SkipBuild           Skip frontend build" -ForegroundColor Gray
+    Write-Host "  -CleanRefresh        Reinstall frontend/backend dependencies" -ForegroundColor Gray
+    Write-Host "  -VerboseLogging      Enable verbose backend + access logs" -ForegroundColor Gray
+    Write-Host "  -Port <int>          Backend port (default 8000)" -ForegroundColor Gray
+    Write-Host "  -Message <string>    Custom home page message" -ForegroundColor Gray
+    Write-Host "  -CopilotModel <str>  Sets QUIZ_COPILOT_MODEL for AI endpoints" -ForegroundColor Gray
+    Write-Host "" 
+    Write-Host "Valid Copilot models:" -ForegroundColor White
+    Write-Host "  claude-sonnet-4.5" -ForegroundColor Gray
+    Write-Host "  claude-haiku-4.5" -ForegroundColor Gray
+    Write-Host "  claude-opus-4.5" -ForegroundColor Gray
+    Write-Host "  claude-sonnet-4" -ForegroundColor Gray
+    Write-Host "  gemini-3-pro-preview" -ForegroundColor Gray
+    Write-Host "  gpt-5.2-codex" -ForegroundColor Gray
+    Write-Host "  gpt-5.2" -ForegroundColor Gray
+    Write-Host "  gpt-5.1-codex-max" -ForegroundColor Gray
+    Write-Host "  gpt-5.1-codex" -ForegroundColor Gray
+    Write-Host "  gpt-5.1" -ForegroundColor Gray
+    Write-Host "  gpt-5" -ForegroundColor Gray
+    Write-Host "  gpt-5.1-codex-mini" -ForegroundColor Gray
+    Write-Host "  gpt-5-mini" -ForegroundColor Gray
+    Write-Host "  gpt-4.1" -ForegroundColor Gray
+    Write-Host "" 
+    Write-Host "Example:" -ForegroundColor White
+    Write-Host "  .\\start.ps1 -CopilotModel gpt-5.2-codex" -ForegroundColor Gray
+    exit 0
+}
 
 $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -82,6 +122,15 @@ if ($env:QUIZ_AUTH_SECRET) {
     Write-Host "   QUIZ_AUTH_SECRET: ✅ Set (${($env:QUIZ_AUTH_SECRET.Length)} chars)" -ForegroundColor Green
 } else {
     Write-Host "   QUIZ_AUTH_SECRET: ⚠️ Not set (AI endpoints unprotected!)" -ForegroundColor Yellow
+}
+
+if ($CopilotModel) {
+    $env:QUIZ_COPILOT_MODEL = $CopilotModel
+    Write-Host "   QUIZ_COPILOT_MODEL: ✅ $CopilotModel" -ForegroundColor Green
+} elseif ($env:QUIZ_COPILOT_MODEL) {
+    Write-Host "   QUIZ_COPILOT_MODEL: ✅ $env:QUIZ_COPILOT_MODEL" -ForegroundColor Green
+} else {
+    Write-Host "   QUIZ_COPILOT_MODEL: ℹ️ Not set (default gpt-4.1)" -ForegroundColor Gray
 }
 
 if ($env:GITHUB_TOKEN) {
@@ -238,18 +287,20 @@ Write-Host "`n⚡ Starting uvicorn on port $Port..." -ForegroundColor Yellow
 $authSecret = $env:QUIZ_AUTH_SECRET
 $githubToken = $env:GITHUB_TOKEN
 $ghToken = $env:GH_TOKEN
+$copilotModel = $env:QUIZ_COPILOT_MODEL
 
 $uvicornLogLevel = if ($VerboseLogging) { "debug" } else { "info" }
 $uvicornAccessLog = $VerboseLogging
 
 $backendJob = Start-Job -ScriptBlock {
-    param($path, $port, $authSecret, $githubToken, $ghToken, $logLevel, $accessLog)
+    param($path, $port, $authSecret, $githubToken, $ghToken, $copilotModel, $logLevel, $accessLog)
     Set-Location $path
     
     # Set environment variables in the job
     if ($authSecret) { $env:QUIZ_AUTH_SECRET = $authSecret }
     if ($githubToken) { $env:GITHUB_TOKEN = $githubToken }
     if ($ghToken) { $env:GH_TOKEN = $ghToken }
+    if ($copilotModel) { $env:QUIZ_COPILOT_MODEL = $copilotModel }
     
     # Activate venv if it exists
     $venvActivate = Join-Path $path "venv\Scripts\Activate.ps1"
@@ -269,7 +320,7 @@ $backendJob = Start-Job -ScriptBlock {
     }
 
     python -m uvicorn @uvicornArgs
-} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken, $uvicornLogLevel, $uvicornAccessLog
+} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken, $copilotModel, $uvicornLogLevel, $uvicornAccessLog
 
 # Wait for backend to start
 Write-Host "⏳ Waiting for backend to initialize..." -ForegroundColor Gray
@@ -337,7 +388,7 @@ if (-not $UseNgrok) {
         Stop-Job $backendJob -ErrorAction SilentlyContinue
         Remove-Job $backendJob -ErrorAction SilentlyContinue
         
-        Write-Host "✅ Cleanup complete" -ForegroundColor Green
+        Write-Host "Cleanup complete" -ForegroundColor Green
     }
 }
 
