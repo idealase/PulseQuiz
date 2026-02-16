@@ -1297,7 +1297,7 @@ export default function HostSession() {
                         <span className="text-sm text-white/60">{challenge.count} challenge{challenge.count !== 1 ? 's' : ''}</span>
                       </div>
                       <div className="mt-1 text-xs text-white/50">
-                        Status: {challenge.status}
+                        Status: {challenge.status.replace(/_/g, ' ')}
                       </div>
                     </button>
                   ))}

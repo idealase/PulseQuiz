@@ -93,6 +93,20 @@ class AnswerStatus(BaseModel):
     waiting: list[str]   # Player IDs who haven't answered
 
 
+class ChallengeReply(BaseModel):
+    replyId: str
+    playerId: str
+    nickname: str
+    text: str
+    createdAt: float
+
+
+class ChallengeVote(BaseModel):
+    playerId: str
+    vote: int  # +1 or -1
+    createdAt: float
+
+
 class ChallengeSubmission(BaseModel):
     playerId: str
     nickname: str
@@ -101,6 +115,9 @@ class ChallengeSubmission(BaseModel):
     note: Optional[str] = None
     source: str = "review"  # review | mid_game
     createdAt: float
+    replies: list[ChallengeReply] = []
+    votes: dict[str, int] = {}  # playerId -> +1 or -1
+    voteScore: int = 0
 
 
 class ChallengeResolution(BaseModel):

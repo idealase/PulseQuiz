@@ -117,10 +117,11 @@ export type ServerMessage =
   | { type: 'leaderboard_update'; leaderboard: LiveLeaderboardEntry[] }
   | { type: 'question_stats'; stats: QuestionStats }
   | { type: 'questions_updated'; totalQuestions: number; addedCount: number }
-  | { type: 'challenge_updated'; questionIndex: number; count: number; status: string }
+  | { type: 'challenge_updated'; questionIndex: number; count: number; status: string; categories?: Record<string, number>; latestSubmission?: { nickname: string; category?: string; note?: string; createdAt: number } }
   | { type: 'challenge_resolution'; questionIndex: number; resolution: ChallengeResolution }
   | { type: 'challenge_ai_verified'; questionIndex: number; aiVerification: AIVerification }
   | { type: 'challenge_ai_published'; questionIndex: number; aiVerification: AIVerification }
+  | { type: 'challenge_reply'; questionIndex: number; reply: ChallengeReply; totalReplies: number }
   | { type: 'scores_reconciled'; questionIndex: number; policy: ReconciliationPolicy; deltas: Record<string, number> }
   | { type: 'theme_updated'; theme: ThemeSpec }
   | { type: 'error'; message: string }
@@ -165,6 +166,38 @@ export interface ChallengeSubmission {
   note?: string
   source: string
   createdAt: number
+  replies?: ChallengeReply[]
+  voteScore?: number
+  myVote?: number
+}
+
+export interface ChallengeReply {
+  replyId: string
+  playerId: string
+  nickname: string
+  text: string
+  createdAt: number
+}
+
+export interface ChallengeThreadEntry {
+  type: 'challenge'
+  playerId: string
+  nickname: string
+  category?: string
+  note?: string
+  createdAt: number
+  voteScore: number
+  myVote: number
+  replies: ChallengeReply[]
+}
+
+export interface ChallengeThread {
+  questionIndex: number
+  question: string
+  challengeCount: number
+  status: string
+  resolution?: ChallengeResolution | null
+  thread: ChallengeThreadEntry[]
 }
 
 export interface ChallengeResolution {

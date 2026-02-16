@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { useTheme } from '../context/ThemeContext'
 import { ApiClient, createSmartConnection } from '../api/client'
-import { SessionState, ServerMessage, RevealResults, QuestionResult } from '../types'
+import { SessionState, ServerMessage, RevealResults, QuestionResult, ChallengeThread, ChallengeReply } from '../types'
 import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 
 export default function PlayerSession() {
@@ -32,6 +32,16 @@ export default function PlayerSession() {
   const [challengeSubmitting, setChallengeSubmitting] = useState(false)
   const [challengedQuestions, setChallengedQuestions] = useState<Set<number>>(new Set())
   const [challengeMessage, setChallengeMessage] = useState<string | null>(null)
+  
+  // Challenge badges visible to all players: questionIndex -> { count, status, latestNote, latestNickname }
+  const [challengeBadges, setChallengeBadges] = useState<Record<number, { count: number; status: string; latestNickname?: string; latestNote?: string }>>({})
+  
+  // Thread conversation state
+  const [threadOpen, setThreadOpen] = useState<number | null>(null) // questionIndex of open thread
+  const [threadData, setThreadData] = useState<ChallengeThread | null>(null)
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [replyText, setReplyText] = useState('')
+  const [replySubmitting, setReplySubmitting] = useState(false)
 
   // Track when question was shown for response time measurement
   const questionShownAtRef = useRef<number>(Date.now())
@@ -70,6 +80,47 @@ export default function PlayerSession() {
       setChallengeMessage(e instanceof Error ? e.message : 'Failed to submit challenge')
     }
     setChallengeSubmitting(false)
+  }
+
+  const openThread = useCallback(async (questionIndex: number) => {
+    if (!code || !playerId) return
+    setThreadOpen(questionIndex)
+    setThreadLoading(true)
+    setReplyText('')
+    try {
+      const data = await api.getChallengeThread(code, questionIndex, playerId)
+      setThreadData(data)
+    } catch {
+      setThreadData(null)
+    }
+    setThreadLoading(false)
+  }, [code, playerId, api])
+
+  const submitReply = async () => {
+    if (!code || !playerId || threadOpen === null || !replyText.trim()) return
+    setReplySubmitting(true)
+    try {
+      await api.replyToChallenge(code, playerId, threadOpen, replyText.trim())
+      setReplyText('')
+      // Refresh thread
+      const data = await api.getChallengeThread(code, threadOpen, playerId)
+      setThreadData(data)
+    } catch {
+      // silent
+    }
+    setReplySubmitting(false)
+  }
+
+  const handleVote = async (questionIndex: number, challengePlayerId: string, vote: number) => {
+    if (!code || !playerId) return
+    try {
+      await api.voteOnChallenge(code, playerId, questionIndex, challengePlayerId, vote)
+      // Refresh thread
+      const data = await api.getChallengeThread(code, questionIndex, playerId)
+      setThreadData(data)
+    } catch {
+      // silent
+    }
   }
 
   useEffect(() => {
@@ -169,6 +220,29 @@ export default function PlayerSession() {
             scoringPolicy: msg.policy.policy,
             acceptedAnswers: msg.policy.acceptedAnswers
           } : q) : prev)
+          break
+        case 'challenge_updated':
+          // All players now receive challenge updates — track badges
+          setChallengeBadges(prev => ({
+            ...prev,
+            [msg.questionIndex]: {
+              count: msg.count,
+              status: msg.status,
+              latestNickname: msg.latestSubmission?.nickname,
+              latestNote: msg.latestSubmission?.note,
+            }
+          }))
+          break
+        case 'challenge_reply':
+          // If the thread is open for this question, append the reply  
+          setThreadData(prev => {
+            if (!prev || prev.questionIndex !== msg.questionIndex) return prev
+            // Add the reply to the first thread entry's replies
+            const updatedThread = prev.thread.map((entry, idx) => 
+              idx === 0 ? { ...entry, replies: [...entry.replies, msg.reply] } : entry
+            )
+            return { ...prev, thread: updatedThread }
+          })
           break
         case 'error':
           setError(msg.message)
@@ -344,6 +418,13 @@ export default function PlayerSession() {
             >
               {challengedQuestions.has(session.currentQuestionIndex) ? 'Flagged' : 'Flag / Challenge'}
             </button>
+            {/* Live challenge badge — shows when other players have challenged this question */}
+            {challengeBadges[session.currentQuestionIndex] && challengeBadges[session.currentQuestionIndex].count > 0 && (
+              <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg bg-orange-500/15 border border-orange-400/30 text-orange-300 animate-[fadeIn_0.5s_ease-in-out]">
+                <span>🚩</span>
+                <span>{challengeBadges[session.currentQuestionIndex].count} challenged</span>
+              </div>
+            )}
           </div>
 
           {challengeForm?.source === 'mid_game' && challengeForm.questionIndex === session.currentQuestionIndex && (
@@ -538,35 +619,60 @@ export default function PlayerSession() {
                   </p>
                 )}
 
-                {q.challengeStatus && (() => {
-                  const isValid = q.resolutionVerdict?.toLowerCase().includes('valid') && !q.resolutionVerdict?.toLowerCase().includes('invalid')
-                  const isInvalid = q.resolutionVerdict?.toLowerCase().includes('invalid')
-                  const verdictColor = isValid ? 'text-green-300' : isInvalid ? 'text-red-300' : 'text-yellow-300'
-                  const verdictBg = isValid ? 'bg-green-500/15 border-green-400/30' : isInvalid ? 'bg-red-500/15 border-red-400/30' : 'bg-yellow-500/15 border-yellow-400/30'
-                  const verdictIcon = isValid ? '✅' : isInvalid ? '❌' : '⚖️'
-                  const glowColor = isValid ? 'shadow-green-500/20' : isInvalid ? 'shadow-red-500/20' : 'shadow-yellow-500/20'
+                {/* Challenge badge — visible to ALL players when anyone has challenged this question */}
+                {(() => {
+                  const badge = challengeBadges[i]
+                  if (!badge && !q.challengeStatus) return null
+                  const count = badge?.count || 0
+                  const status = q.challengeStatus || badge?.status || 'open'
+                  const statusLabel = status.replace(/_/g, ' ')
+                  const isUnderReview = status === 'under_review'
+                  const isResolved = status === 'resolved'
+                  const badgeBg = isResolved ? 'bg-green-500/15 border-green-400/30' : isUnderReview ? 'bg-yellow-500/15 border-yellow-400/30' : 'bg-orange-500/15 border-orange-400/30'
+                  const badgeIcon = isResolved ? '✅' : isUnderReview ? '⚖️' : '🚩'
 
                   return (
-                    <div className={`mt-3 rounded-xl border p-4 ${verdictBg} ${glowColor} shadow-lg animate-[fadeIn_0.5s_ease-in-out]`}>
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xl">{verdictIcon}</span>
-                        <span className={`font-bold text-sm uppercase tracking-wide ${verdictColor}`}>
-                          Challenge {q.challengeStatus}
+                    <div className={`mt-3 rounded-xl border p-3 ${badgeBg} animate-[fadeIn_0.5s_ease-in-out]`}>
+                      {/* Badge header */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">{badgeIcon}</span>
+                        <span className="font-bold text-sm uppercase tracking-wide text-white/90">
+                          Challenge {statusLabel}
                         </span>
-                        {q.resolutionVerdict && (
-                          <span className={`ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full ${
-                            isValid ? 'bg-green-500/25 text-green-200' : isInvalid ? 'bg-red-500/25 text-red-200' : 'bg-yellow-500/25 text-yellow-200'
-                          }`}>
-                            {q.resolutionVerdict}
+                        {count > 0 && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-white/15 text-white/70">
+                            {count} {count === 1 ? 'challenge' : 'challenges'}
                           </span>
                         )}
+                        {q.resolutionVerdict && (() => {
+                          const isValid = q.resolutionVerdict?.toLowerCase().includes('valid') && !q.resolutionVerdict?.toLowerCase().includes('invalid')
+                          const isInvalid = q.resolutionVerdict?.toLowerCase().includes('invalid')
+                          return (
+                            <span className={`ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                              isValid ? 'bg-green-500/25 text-green-200' : isInvalid ? 'bg-red-500/25 text-red-200' : 'bg-yellow-500/25 text-yellow-200'
+                            }`}>
+                              {q.resolutionVerdict}
+                            </span>
+                          )
+                        })()}
                       </div>
+
+                      {/* Latest challenge preview */}
+                      {badge?.latestNickname && (
+                        <p className="text-xs text-white/60 mt-1.5 pl-7">
+                          <span className="font-medium text-white/80">{badge.latestNickname}</span>
+                          {badge.latestNote ? `: "${badge.latestNote}"` : ' challenged this question'}
+                        </p>
+                      )}
+
+                      {/* Resolution note */}
                       {q.resolutionNote && (
-                        <p className="text-sm text-white/80 mt-1 pl-7 italic">
+                        <p className="text-sm text-white/80 mt-2 pl-7 italic">
                           "{q.resolutionNote}"
                         </p>
                       )}
 
+                      {/* AI verification */}
                       {q.aiVerdict && (
                         <div className="mt-3 pt-3 border-t border-white/10 pl-7">
                           <div className="flex items-center gap-2 mb-1">
@@ -584,6 +690,7 @@ export default function PlayerSession() {
                         </div>
                       )}
 
+                      {/* Scoring policy */}
                       {q.scoringPolicy && (
                         <div className="mt-3 pt-3 border-t border-white/10 pl-7">
                           <div className="flex items-center gap-2">
@@ -596,11 +703,19 @@ export default function PlayerSession() {
                           </div>
                         </div>
                       )}
+
+                      {/* View Thread button */}
+                      <button
+                        onClick={() => openThread(i)}
+                        className="mt-3 w-full text-xs py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all flex items-center justify-center gap-1.5"
+                      >
+                        💬 View Discussion Thread
+                      </button>
                     </div>
                   )
                 })()}
 
-                {!q.challengeStatus && q.scoringPolicy && (
+                {!q.challengeStatus && !challengeBadges[i] && q.scoringPolicy && (
                   <div className="mt-1 text-xs text-white/60">
                     Scoring policy: {q.scoringPolicy}
                     {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
@@ -609,14 +724,14 @@ export default function PlayerSession() {
                   </div>
                 )}
 
-                {!q.challengeStatus && q.aiVerdict && (
+                {!q.challengeStatus && !challengeBadges[i] && q.aiVerdict && (
                   <div className="mt-2 text-xs text-white/60">
                     AI: {q.aiVerdict} ({Math.round((q.aiConfidence ?? 0) * 100)}%)
                     {q.aiRationale && <span className="block mt-1">{q.aiRationale}</span>}
                   </div>
                 )}
 
-                <div className="mt-3">
+                <div className="mt-3 flex items-center gap-2">
                   <button
                     onClick={() => setChallengeForm({ questionIndex: i, source: 'review' })}
                     disabled={challengedQuestions.has(i)}
@@ -624,6 +739,14 @@ export default function PlayerSession() {
                   >
                     {challengedQuestions.has(i) ? 'Challenge submitted' : 'Challenge this question'}
                   </button>
+                  {challengeBadges[i] && challengeBadges[i].count > 0 && (
+                    <button
+                      onClick={() => openThread(i)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20"
+                    >
+                      💬 {challengeBadges[i].count} discussion{challengeBadges[i].count !== 1 ? 's' : ''}
+                    </button>
+                  )}
                 </div>
 
                 {challengeForm?.source === 'review' && challengeForm.questionIndex === i && (
@@ -666,6 +789,148 @@ export default function PlayerSession() {
 
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Challenge Thread Modal */}
+      {threadOpen !== null && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-gray-900 border border-white/20 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
+            {/* Thread header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+              <div>
+                <h3 className="font-bold text-base">Challenge Discussion</h3>
+                <p className="text-xs text-white/50">
+                  Q{threadOpen + 1}{threadData ? ` — ${threadData.status.replace(/_/g, ' ')}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => { setThreadOpen(null); setThreadData(null) }}
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Thread content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+              {threadLoading && (
+                <div className="text-center text-white/50 py-8 animate-pulse">Loading thread...</div>
+              )}
+
+              {!threadLoading && threadData && threadData.thread.length === 0 && (
+                <div className="text-center text-white/50 py-8">No challenges yet for this question.</div>
+              )}
+
+              {!threadLoading && threadData && threadData.thread.map((entry, idx) => (
+                <div key={idx} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  {/* Challenge submission */}
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg shrink-0 mt-0.5">🚩</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-white/90">{entry.nickname}</span>
+                        {entry.category && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300">{entry.category}</span>
+                        )}
+                        <span className="text-xs text-white/40 ml-auto shrink-0">
+                          {new Date(entry.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {entry.note && (
+                        <p className="text-sm text-white/70 mt-1">{entry.note}</p>
+                      )}
+                      {!entry.note && (
+                        <p className="text-sm text-white/50 mt-1 italic">Challenged without comment</p>
+                      )}
+
+                      {/* Vote buttons */}
+                      <div className="flex items-center gap-3 mt-2">
+                        <button
+                          onClick={() => handleVote(threadOpen, entry.playerId, entry.myVote === 1 ? 0 : 1)}
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-all ${
+                            entry.myVote === 1
+                              ? 'bg-green-500/20 border-green-400/40 text-green-300'
+                              : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                          }`}
+                        >
+                          👍 Agree
+                        </button>
+                        <button
+                          onClick={() => handleVote(threadOpen, entry.playerId, entry.myVote === -1 ? 0 : -1)}
+                          className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-all ${
+                            entry.myVote === -1
+                              ? 'bg-red-500/20 border-red-400/40 text-red-300'
+                              : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
+                          }`}
+                        >
+                          👎 Disagree
+                        </button>
+                        <span className={`text-xs font-medium ${
+                          entry.voteScore > 0 ? 'text-green-400' : entry.voteScore < 0 ? 'text-red-400' : 'text-white/40'
+                        }`}>
+                          {entry.voteScore > 0 ? '+' : ''}{entry.voteScore}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Replies to this challenge */}
+                  {entry.replies.length > 0 && (
+                    <div className="mt-3 ml-6 space-y-2 border-l-2 border-white/10 pl-3">
+                      {entry.replies.map((reply) => (
+                        <div key={reply.replyId} className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-white/80">{reply.nickname}</span>
+                            <span className="text-xs text-white/40">
+                              {new Date(reply.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-white/60 mt-0.5">{reply.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* Resolution notice in thread */}
+              {!threadLoading && threadData?.resolution && (
+                <div className="rounded-xl bg-green-500/10 border border-green-400/30 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚖️</span>
+                    <span className="font-bold text-sm text-green-300 uppercase">
+                      Resolution: {threadData.resolution.verdict || threadData.resolution.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  {threadData.resolution.resolutionNote && (
+                    <p className="text-sm text-white/70 mt-1 pl-7 italic">"{threadData.resolution.resolutionNote}"</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Reply input */}
+            <div className="border-t border-white/10 p-3 shrink-0">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={replyText}
+                  onChange={(e) => setReplyText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitReply() } }}
+                  placeholder="Add to the discussion..."
+                  className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-sm placeholder-white/40 focus:outline-none focus:border-white/40"
+                />
+                <button
+                  onClick={submitReply}
+                  disabled={!replyText.trim() || replySubmitting}
+                  className="px-4 py-2 rounded-lg bg-primary/80 hover:bg-primary text-sm font-medium disabled:opacity-40 transition-all shrink-0"
+                >
+                  {replySubmitting ? '...' : 'Send'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

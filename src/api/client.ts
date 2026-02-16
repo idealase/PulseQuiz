@@ -7,6 +7,8 @@ import {
   ChallengeSummary,
   ChallengeDetail,
   ChallengeResolution,
+  ChallengeReply,
+  ChallengeThread,
   AIVerification,
   ReconciliationPolicy,
   ThemeSpec
@@ -284,6 +286,36 @@ export class ApiClient {
   async getMyChallenges(code: string, playerId: string): Promise<{ questionIndexes: number[] }> {
     const params = new URLSearchParams({ player_id: playerId })
     return this.request(`/api/session/${code}/challenges/mine?${params}`)
+  }
+
+  async getChallengeThread(code: string, questionIndex: number, playerId: string = ''): Promise<ChallengeThread> {
+    const params = new URLSearchParams({ player_id: playerId })
+    return this.request(`/api/session/${code}/challenges/thread/${questionIndex}?${params}`)
+  }
+
+  async voteOnChallenge(
+    code: string,
+    playerId: string,
+    questionIndex: number,
+    challengePlayerId: string,
+    vote: number
+  ): Promise<{ ok: boolean; voteScore: number }> {
+    return this.request(`/api/session/${code}/challenges/vote`, {
+      method: 'POST',
+      body: JSON.stringify({ playerId, questionIndex, challengePlayerId, vote })
+    })
+  }
+
+  async replyToChallenge(
+    code: string,
+    playerId: string,
+    questionIndex: number,
+    text: string
+  ): Promise<{ ok: boolean; reply: ChallengeReply }> {
+    return this.request(`/api/session/${code}/challenges/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ playerId, questionIndex, text })
+    })
   }
 
   async getChallenges(code: string, hostToken: string): Promise<{ challenges: ChallengeSummary[] }> {
