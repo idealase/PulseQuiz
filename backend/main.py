@@ -135,24 +135,6 @@ class AnswerRequest(BaseModel):
     response_time_ms: Optional[int] = None  # Client-measured response time in milliseconds
 
 
-class FeedbackRequest(BaseModel):
-    playerId: Optional[str] = None
-    questionIndex: Optional[int] = None
-    message: str
-    feedbackType: Optional[str] = None
-    selectedChoice: Optional[int] = None
-    correctChoice: Optional[int] = None
-
-
-class SoloFeedbackRequest(BaseModel):
-    question: str
-    options: List[str]
-    message: str
-    feedbackType: Optional[str] = None
-    selectedChoice: Optional[int] = None
-    correctChoice: Optional[int] = None
-
-
 class ChallengeRequest(BaseModel):
     playerId: str
     questionIndex: int
@@ -793,15 +775,6 @@ def build_challenge_summary(session: Session, question_index: int) -> dict:
     }
 
 
-def log_feedback_event(payload: dict) -> None:
-    logger.info("🗣️ Feedback received: %s", json.dumps(payload, default=str))
-    log_game_event(
-        "feedback_received",
-        session_code=payload.get("session"),
-        player_id=payload.get("playerId"),
-        data=payload,
-    )
-
 async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None, host_only: bool = False, exclude_observers: bool = False):
     """Broadcast a message to all connections in a session"""
     # Store event for polling fallback
@@ -1013,6 +986,39 @@ async def upload_questions(
     log_game_event("questions_uploaded", session_code=code, data={"count": len(request.questions)})
 
     return {"ok": True, "count": len(request.questions)}
+
+
+class SetThemeRequest(BaseModel):
+    theme: dict
+
+
+@app.post("/api/session/{code}/theme")
+async def set_session_theme(
+    code: str,
+    request: SetThemeRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Set the session theme (host only). Broadcasts to all connected clients."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    session.theme = request.theme
+
+    logger.info(f"🎨 Theme updated for session {code}")
+    log_game_event("theme_updated", session_code=code, data={"themeId": request.theme.get("themeId")})
+
+    # Broadcast theme to all connected clients (players, observers)
+    await broadcast_to_session(code, {
+        'type': 'theme_updated',
+        'theme': request.theme
+    })
+
+    return {"ok": True}
 
 
 @app.post("/api/session/{code}/append-questions")
@@ -1342,88 +1348,6 @@ async def submit_answer(code: str, request: AnswerRequest):
     
     return {"ok": True}
 
-
-@app.post("/api/session/{code}/feedback")
-async def submit_session_feedback(code: str, request: FeedbackRequest):
-    """Submit feedback for a session question (player)."""
-    if code not in sessions:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    session = sessions[code]
-    if request.playerId and request.playerId not in session.players:
-        raise HTTPException(status_code=404, detail="Player not found")
-
-    if request.questionIndex is None:
-        raise HTTPException(status_code=400, detail="Missing question index")
-
-    question = None
-    if 0 <= request.questionIndex < len(session.questions):
-        question = session.questions[request.questionIndex]
-
-    selected_choice = request.selectedChoice
-    correct_choice = request.correctChoice
-    if question and correct_choice is None:
-        correct_choice = question.correct
-
-    selected_text = None
-    correct_text = None
-    if question:
-        if isinstance(selected_choice, int) and 0 <= selected_choice < len(question.options):
-            selected_text = question.options[selected_choice]
-        if isinstance(correct_choice, int) and 0 <= correct_choice < len(question.options):
-            correct_text = question.options[correct_choice]
-
-    nickname = None
-    if request.playerId and request.playerId in session.players:
-        nickname = session.players[request.playerId].nickname
-
-    payload = {
-        "session": code,
-        "playerId": request.playerId,
-        "nickname": nickname,
-        "questionIndex": request.questionIndex,
-        "question": question.question if question else None,
-        "selectedChoice": selected_choice,
-        "selectedText": selected_text,
-        "correctChoice": correct_choice,
-        "correctText": correct_text,
-        "feedbackType": request.feedbackType or "question",
-        "message": request.message,
-        "source": "multiplayer",
-    }
-    log_feedback_event(payload)
-    return {"ok": True}
-
-
-@app.post("/api/feedback")
-async def submit_solo_feedback(request: SoloFeedbackRequest):
-    """Submit feedback for solo questions (logs to backend)."""
-    selected_choice = request.selectedChoice
-    correct_choice = request.correctChoice
-    selected_text = None
-    correct_text = None
-
-    if isinstance(selected_choice, int) and 0 <= selected_choice < len(request.options):
-        selected_text = request.options[selected_choice]
-    if isinstance(correct_choice, int) and 0 <= correct_choice < len(request.options):
-        correct_text = request.options[correct_choice]
-
-    payload = {
-        "session": None,
-        "playerId": None,
-        "nickname": None,
-        "questionIndex": None,
-        "question": request.question,
-        "selectedChoice": selected_choice,
-        "selectedText": selected_text,
-        "correctChoice": correct_choice,
-        "correctText": correct_text,
-        "feedbackType": request.feedbackType or "question",
-        "message": request.message,
-        "source": "solo",
-    }
-    log_feedback_event(payload)
-    return {"ok": True}
 
 
 @app.post("/api/session/{code}/challenge")

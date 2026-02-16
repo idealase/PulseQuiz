@@ -99,24 +99,6 @@ interface GenerateThemeResponse {
   issues?: string[]
 }
 
-interface FeedbackRequest {
-  playerId?: string
-  questionIndex: number
-  message: string
-  feedbackType?: string
-  selectedChoice?: number | null
-  correctChoice?: number | null
-}
-
-interface SoloFeedbackRequest {
-  question: string
-  options: string[]
-  message: string
-  feedbackType?: string
-  selectedChoice?: number | null
-  correctChoice?: number | null
-}
-
 export class ApiClient {
   constructor(private baseUrl: string) {}
 
@@ -167,6 +149,14 @@ export class ApiClient {
     })
   }
 
+  async setSessionTheme(code: string, hostToken: string, theme: ThemeSpec): Promise<void> {
+    return this.request(`/api/session/${code}/theme`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify({ theme }),
+    })
+  }
+
   async startRound(code: string, hostToken: string): Promise<void> {
     return this.request(`/api/session/${code}/start`, {
       method: 'POST',
@@ -192,20 +182,6 @@ export class ApiClient {
     return this.request(`/api/session/${code}/answer`, {
       method: 'POST',
       body: JSON.stringify({ playerId, questionIndex, choice, response_time_ms: responseTimeMs ?? null }),
-    })
-  }
-
-  async submitFeedback(code: string, payload: FeedbackRequest): Promise<void> {
-    return this.request(`/api/session/${code}/feedback`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    })
-  }
-
-  async submitSoloFeedback(payload: SoloFeedbackRequest): Promise<void> {
-    return this.request('/api/feedback', {
-      method: 'POST',
-      body: JSON.stringify(payload),
     })
   }
 
