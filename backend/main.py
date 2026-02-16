@@ -19,6 +19,7 @@ import shutil
 from models import (
     Session, Question, Player, GameSettings,
     LiveLeaderboardEntry, QuestionStats, AnswerStatus,
+    ChallengeSubmission, ChallengeResolution, AIVerification, ReconciliationPolicy, ScoreAuditEntry,
     generate_session_code, generate_token, generate_player_id
 )
 from theme_spec import (
@@ -132,6 +133,54 @@ class AnswerRequest(BaseModel):
     questionIndex: int
     choice: int
     response_time_ms: Optional[int] = None  # Client-measured response time in milliseconds
+
+
+class FeedbackRequest(BaseModel):
+    playerId: Optional[str] = None
+    questionIndex: Optional[int] = None
+    message: str
+    feedbackType: Optional[str] = None
+    selectedChoice: Optional[int] = None
+    correctChoice: Optional[int] = None
+
+
+class SoloFeedbackRequest(BaseModel):
+    question: str
+    options: List[str]
+    message: str
+    feedbackType: Optional[str] = None
+    selectedChoice: Optional[int] = None
+    correctChoice: Optional[int] = None
+
+
+class ChallengeRequest(BaseModel):
+    playerId: str
+    questionIndex: int
+    note: Optional[str] = None
+    category: Optional[str] = None
+    source: str = "review"  # review | mid_game
+
+
+class ChallengeResolutionRequest(BaseModel):
+    status: str = "open"  # open | under_review | resolved
+    verdict: Optional[str] = None  # valid | invalid | ambiguous
+    resolutionNote: Optional[str] = None
+    publish: bool = False
+
+
+class ChallengeAIVerifyRequest(BaseModel):
+    questionIndex: int
+
+
+class ChallengePublishRequest(BaseModel):
+    publish: bool = True
+
+
+class ReconcileRequest(BaseModel):
+    questionIndex: int
+    policy: str  # void | award_all | accept_multiple
+    acceptedAnswers: Optional[List[int]] = None
+    note: Optional[str] = None
 
 
 class ObserveResponse(BaseModel):
@@ -714,6 +763,45 @@ async def auto_advance_question(code: str, session):
 
 # --- Helper Functions ---
 
+def build_challenge_summary(session: Session, question_index: int) -> dict:
+    submissions = session.challenges.get(question_index, {})
+    categories: dict[str, int] = {}
+    latest_ts = 0.0
+
+    for submission in submissions.values():
+        if submission.category:
+            categories[submission.category] = categories.get(submission.category, 0) + 1
+        latest_ts = max(latest_ts, submission.createdAt)
+
+    resolution = session.challenge_resolutions.get(question_index)
+    if resolution and resolution.resolvedAt:
+        latest_ts = max(latest_ts, resolution.resolvedAt)
+
+    if 0 <= question_index < len(session.questions):
+        question_text = session.questions[question_index].question
+    else:
+        question_text = f"Question {question_index + 1}"
+
+    status = resolution.status if resolution else "open"
+    return {
+        "questionIndex": question_index,
+        "question": question_text,
+        "count": len(submissions),
+        "status": status,
+        "categories": categories,
+        "lastUpdatedAt": latest_ts or time.time(),
+    }
+
+
+def log_feedback_event(payload: dict) -> None:
+    logger.info("🗣️ Feedback received: %s", json.dumps(payload, default=str))
+    log_game_event(
+        "feedback_received",
+        session_code=payload.get("session"),
+        player_id=payload.get("playerId"),
+        data=payload,
+    )
+
 async def broadcast_to_session(code: str, message: dict, exclude_id: Optional[str] = None, host_only: bool = False, exclude_observers: bool = False):
     """Broadcast a message to all connections in a session"""
     # Store event for polling fallback
@@ -1253,6 +1341,412 @@ async def submit_answer(code: str, request: AnswerRequest):
             await auto_advance_question(code, session)
     
     return {"ok": True}
+
+
+@app.post("/api/session/{code}/feedback")
+async def submit_session_feedback(code: str, request: FeedbackRequest):
+    """Submit feedback for a session question (player)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if request.playerId and request.playerId not in session.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if request.questionIndex is None:
+        raise HTTPException(status_code=400, detail="Missing question index")
+
+    question = None
+    if 0 <= request.questionIndex < len(session.questions):
+        question = session.questions[request.questionIndex]
+
+    selected_choice = request.selectedChoice
+    correct_choice = request.correctChoice
+    if question and correct_choice is None:
+        correct_choice = question.correct
+
+    selected_text = None
+    correct_text = None
+    if question:
+        if isinstance(selected_choice, int) and 0 <= selected_choice < len(question.options):
+            selected_text = question.options[selected_choice]
+        if isinstance(correct_choice, int) and 0 <= correct_choice < len(question.options):
+            correct_text = question.options[correct_choice]
+
+    nickname = None
+    if request.playerId and request.playerId in session.players:
+        nickname = session.players[request.playerId].nickname
+
+    payload = {
+        "session": code,
+        "playerId": request.playerId,
+        "nickname": nickname,
+        "questionIndex": request.questionIndex,
+        "question": question.question if question else None,
+        "selectedChoice": selected_choice,
+        "selectedText": selected_text,
+        "correctChoice": correct_choice,
+        "correctText": correct_text,
+        "feedbackType": request.feedbackType or "question",
+        "message": request.message,
+        "source": "multiplayer",
+    }
+    log_feedback_event(payload)
+    return {"ok": True}
+
+
+@app.post("/api/feedback")
+async def submit_solo_feedback(request: SoloFeedbackRequest):
+    """Submit feedback for solo questions (logs to backend)."""
+    selected_choice = request.selectedChoice
+    correct_choice = request.correctChoice
+    selected_text = None
+    correct_text = None
+
+    if isinstance(selected_choice, int) and 0 <= selected_choice < len(request.options):
+        selected_text = request.options[selected_choice]
+    if isinstance(correct_choice, int) and 0 <= correct_choice < len(request.options):
+        correct_text = request.options[correct_choice]
+
+    payload = {
+        "session": None,
+        "playerId": None,
+        "nickname": None,
+        "questionIndex": None,
+        "question": request.question,
+        "selectedChoice": selected_choice,
+        "selectedText": selected_text,
+        "correctChoice": correct_choice,
+        "correctText": correct_text,
+        "feedbackType": request.feedbackType or "question",
+        "message": request.message,
+        "source": "solo",
+    }
+    log_feedback_event(payload)
+    return {"ok": True}
+
+
+@app.post("/api/session/{code}/challenge")
+async def submit_challenge(code: str, request: ChallengeRequest):
+    """Submit a challenge/flag for a question (player)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if request.playerId not in session.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if request.questionIndex < 0 or request.questionIndex >= len(session.questions):
+        raise HTTPException(status_code=400, detail="Invalid question index")
+
+    player = session.players[request.playerId]
+    submission = ChallengeSubmission(
+        playerId=request.playerId,
+        nickname=player.nickname,
+        questionIndex=request.questionIndex,
+        category=request.category,
+        note=request.note,
+        source=request.source,
+        createdAt=time.time(),
+    )
+
+    if request.questionIndex not in session.challenges:
+        session.challenges[request.questionIndex] = {}
+    session.challenges[request.questionIndex][request.playerId] = submission
+
+    summary = build_challenge_summary(session, request.questionIndex)
+    await broadcast_to_session(code, {
+        "type": "challenge_updated",
+        "questionIndex": summary["questionIndex"],
+        "count": summary["count"],
+        "status": summary["status"],
+        "categories": summary["categories"],
+    }, host_only=True)
+
+    log_game_event("challenge_submitted", session_code=code, player_id=request.playerId, data={
+        "question_index": request.questionIndex,
+        "category": request.category,
+        "source": request.source,
+    })
+
+    return {"ok": True}
+
+
+@app.get("/api/session/{code}/challenges/mine")
+async def get_my_challenges(code: str, player_id: str):
+    """Get question indexes challenged by a player."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if player_id not in session.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    question_indexes = [
+        q_idx for q_idx, submissions in session.challenges.items()
+        if player_id in submissions
+    ]
+    return {"questionIndexes": sorted(question_indexes)}
+
+
+@app.get("/api/session/{code}/challenges")
+async def get_challenges(code: str, x_host_token: str = Header(alias="X-Host-Token")):
+    """Get all challenge summaries (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    summaries = [build_challenge_summary(session, q_idx) for q_idx in session.challenges.keys()]
+    summaries.sort(key=lambda s: s["questionIndex"])
+    return {"challenges": summaries}
+
+
+@app.get("/api/session/{code}/challenges/{question_index}")
+async def get_challenge_detail(
+    code: str,
+    question_index: int,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Get challenge detail for a question (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    if question_index < 0 or question_index >= len(session.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    question = session.questions[question_index]
+    submissions = list(session.challenges.get(question_index, {}).values())
+    resolution = session.challenge_resolutions.get(question_index)
+    ai_verification = session.ai_verifications.get(question_index)
+    reconciliation = session.reconciliations.get(question_index)
+
+    return {
+        "questionIndex": question_index,
+        "question": question.question,
+        "options": question.options,
+        "correct": question.correct,
+        "explanation": question.explanation,
+        "submissions": [s.model_dump() for s in submissions],
+        "resolution": resolution.model_dump() if resolution else None,
+        "aiVerification": ai_verification.model_dump() if ai_verification else None,
+        "reconciliation": reconciliation.model_dump() if reconciliation else None,
+    }
+
+
+@app.post("/api/session/{code}/challenges/{question_index}/resolution")
+async def resolve_challenge(
+    code: str,
+    question_index: int,
+    request: ChallengeResolutionRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Update challenge resolution (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    if question_index < 0 or question_index >= len(session.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    resolution = ChallengeResolution(
+        status=request.status,
+        verdict=request.verdict,
+        resolutionNote=request.resolutionNote,
+        resolvedAt=time.time(),
+        resolvedBy="host",
+        published=request.publish,
+    )
+    session.challenge_resolutions[question_index] = resolution
+
+    summary = build_challenge_summary(session, question_index)
+    await broadcast_to_session(code, {
+        "type": "challenge_updated",
+        "questionIndex": summary["questionIndex"],
+        "count": summary["count"],
+        "status": summary["status"],
+        "categories": summary["categories"],
+    }, host_only=True)
+
+    await broadcast_to_session(code, {
+        "type": "challenge_resolution",
+        "questionIndex": question_index,
+        "resolution": resolution.model_dump(),
+    }, host_only=not request.publish)
+
+    return {"ok": True, "resolution": resolution.model_dump()}
+
+
+@app.post("/api/session/{code}/challenges/{question_index}/ai-verify")
+async def ai_verify_challenge(
+    code: str,
+    question_index: int,
+    request: ChallengeAIVerifyRequest,
+    x_host_token: str = Header(alias="X-Host-Token"),
+    x_auth_token: str = Header(alias="X-Auth-Token")
+):
+    """Request AI verification for a challenge (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    if not verify_auth_token(x_auth_token):
+        raise HTTPException(status_code=401, detail="Invalid auth token")
+
+    if question_index < 0 or question_index >= len(session.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    question = session.questions[question_index]
+    prompt = (
+        "Review this trivia question and decide if the provided correct answer is valid. "
+        "Return JSON only with verdict (valid|invalid|ambiguous), confidence (0-1), rationale, "
+        "and suggested_correction (optional).\n\n"
+        f"Question: {question.question}\n"
+        f"Options: {question.options}\n"
+        f"Correct index: {question.correct}\n"
+        f"Correct text: {question.options[question.correct]}\n"
+    )
+
+    content = await generate_with_copilot(
+        prompt,
+        system_message="You are a fact-checker. Output ONLY valid JSON.",
+        caller="challenge_ai_verify",
+    )
+
+    data = extract_json_payload(content)
+    verdict = str(data.get("verdict", "ambiguous")).strip().lower()
+    confidence = float(data.get("confidence", 0.5))
+    confidence = max(0.0, min(1.0, confidence))
+    rationale = str(data.get("rationale", ""))
+    suggested = data.get("suggested_correction")
+
+    verification = AIVerification(
+        verdict=verdict,
+        confidence=confidence,
+        rationale=rationale,
+        suggested_correction=suggested,
+        requestedAt=time.time(),
+        published=False,
+    )
+    session.ai_verifications[question_index] = verification
+
+    await broadcast_to_session(code, {
+        "type": "challenge_ai_verified",
+        "questionIndex": question_index,
+        "aiVerification": verification.model_dump(),
+    }, host_only=True)
+
+    return {"ok": True, "aiVerification": verification.model_dump()}
+
+
+@app.post("/api/session/{code}/challenges/{question_index}/ai-publish")
+async def publish_ai_verification(
+    code: str,
+    question_index: int,
+    request: ChallengePublishRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Publish AI verification to players (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    verification = session.ai_verifications.get(question_index)
+    if not verification:
+        raise HTTPException(status_code=400, detail="AI verification not found")
+
+    verification.published = request.publish
+    verification.publishedAt = time.time() if request.publish else None
+    session.ai_verifications[question_index] = verification
+
+    await broadcast_to_session(code, {
+        "type": "challenge_ai_published",
+        "questionIndex": question_index,
+        "aiVerification": verification.model_dump(),
+    })
+
+    return {"ok": True, "aiVerification": verification.model_dump()}
+
+
+@app.post("/api/session/{code}/challenges/{question_index}/reconcile")
+async def reconcile_scores(
+    code: str,
+    question_index: int,
+    request: ReconcileRequest,
+    x_host_token: str = Header(alias="X-Host-Token")
+):
+    """Reconcile scores for a question (host only)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    if question_index < 0 or question_index >= len(session.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    if request.policy not in ("void", "award_all", "accept_multiple"):
+        raise HTTPException(status_code=400, detail="Invalid policy")
+
+    accepted_answers = request.acceptedAnswers or None
+    policy = ReconciliationPolicy(
+        policy=request.policy,
+        acceptedAnswers=accepted_answers,
+        appliedAt=time.time(),
+        appliedBy="host",
+    )
+
+    prev_scores = {pid: p.score for pid, p in session.players.items()}
+    session.reconciliations[question_index] = policy
+    session.calculate_scores()
+
+    deltas = {pid: session.players[pid].score - prev_scores.get(pid, 0) for pid in session.players}
+    session.score_audit.append(ScoreAuditEntry(
+        questionIndex=question_index,
+        policy=request.policy,
+        appliedAt=policy.appliedAt,
+        deltas=deltas,
+    ))
+
+    await broadcast_to_session(code, {
+        "type": "scores_reconciled",
+        "questionIndex": question_index,
+        "policy": policy.model_dump(),
+        "deltas": deltas,
+    })
+
+    leaderboard = session.get_live_leaderboard()
+    await broadcast_to_session(code, {
+        "type": "leaderboard_update",
+        "leaderboard": [e.model_dump() for e in leaderboard]
+    })
+
+    summary = build_challenge_summary(session, question_index)
+    await broadcast_to_session(code, {
+        "type": "challenge_updated",
+        "questionIndex": summary["questionIndex"],
+        "count": summary["count"],
+        "status": summary["status"],
+        "categories": summary["categories"],
+    }, host_only=True)
+
+    return {"ok": True, "policy": policy.model_dump(), "audit": {"deltas": deltas}}
 
 
 # --- WebSocket Endpoint ---

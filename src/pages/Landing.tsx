@@ -22,6 +22,13 @@ export default function Landing() {
 
       <div className="flex flex-col gap-4 w-full max-w-xs animate-slide-up" style={{ animationDelay: '0.1s' }}>
         <Link
+          to="/solo"
+          className="block w-full py-4 px-8 text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all duration-300 shadow-lg hover:shadow-orange-500/40 hover:scale-105 active:scale-95"
+        >
+          🎯 Solo Mode
+        </Link>
+
+        <Link
           to="/host"
           className="block w-full py-4 px-8 text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all duration-300 shadow-lg hover:shadow-primary/50 hover:scale-105 active:scale-95"
         >
@@ -58,12 +65,6 @@ export default function Landing() {
           👀 Watch Game
         </Link>
         
-        <Link
-          to="/solo"
-          className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-gradient-to-r from-yellow-500/20 to-orange-500/20 border border-yellow-500/50 hover:from-yellow-500/30 hover:to-orange-500/30 hover:border-yellow-500 text-yellow-300 transition-all duration-300 hover:scale-105 active:scale-95"
-        >
-          🎯 Solo Mode
-        </Link>
       </div>
 
       <div className="mt-12 text-white/40 text-sm text-center">

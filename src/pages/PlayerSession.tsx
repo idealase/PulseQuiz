@@ -377,7 +377,7 @@ export default function PlayerSession() {
               <select
                 value={challengeCategory}
                 onChange={(e) => setChallengeCategory(e.target.value)}
-                className="w-full mb-2 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                className="w-full mb-2 rounded-lg bg-white text-gray-900 border border-white/20 px-2 py-1 text-sm"
               >
                 <option value="">Select a category (optional)</option>
                 {challengeCategories.map(category => (
@@ -600,7 +600,7 @@ export default function PlayerSession() {
                     <select
                       value={challengeCategory}
                       onChange={(e) => setChallengeCategory(e.target.value)}
-                      className="w-full mb-2 rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
+                      className="w-full mb-2 rounded-lg bg-white text-gray-900 border border-white/20 px-2 py-1 text-sm"
                     >
                       <option value="">Select a category (optional)</option>
                       {challengeCategories.map(category => (

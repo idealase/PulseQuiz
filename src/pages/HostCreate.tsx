@@ -187,6 +187,7 @@ export default function HostCreate() {
       setGenerationTime(result.generation_time_ms)
 
       if (!lockTheme && experimentalTheme) {
+        setThemeGenerating(true)
         try {
           const themeResult = await api.generateTheme({
             topic: aiTopics,
@@ -195,6 +196,8 @@ export default function HostCreate() {
           applyTheme(themeResult.theme)
         } catch (themeError) {
           console.warn('Theme generation failed', themeError)
+        } finally {
+          setThemeGenerating(false)
         }
       }
       
@@ -255,6 +258,7 @@ export default function HostCreate() {
   const joinUrl = sessionCode 
     ? `${window.location.origin}${import.meta.env.BASE_URL}#/join/${sessionCode}`
     : ''
+  const generationActive = aiGenerating || themeGenerating
 
   return (
     <div className="min-h-screen p-6 max-w-lg mx-auto">
@@ -628,11 +632,27 @@ export default function HostCreate() {
           {/* Start Button */}
           <button
             onClick={handleStartSession}
-            disabled={loading || questions.length === 0}
+            disabled={loading || questions.length === 0 || generationActive}
             className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Starting...' : `Start with ${questions.length} Questions`}
+            {loading ? 'Starting...' : generationActive ? 'Preparing...' : `Start with ${questions.length} Questions`}
           </button>
+        </div>
+      )}
+
+      {generationActive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
+            <div className="text-3xl mb-3">⏳</div>
+            <h3 className="text-lg font-bold">Preparing your game</h3>
+            <p className="text-white/60 text-sm mt-1">
+              {aiGenerating && themeGenerating
+                ? 'Generating questions and theme...'
+                : aiGenerating
+                  ? 'Generating questions...'
+                  : 'Generating theme...'}
+            </p>
+          </div>
         </div>
       )}
     </div>

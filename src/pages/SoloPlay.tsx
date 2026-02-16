@@ -224,6 +224,7 @@ export default function SoloPlay() {
       setGenerationTime(Date.now() - startTime)
 
       if (!lockTheme && experimentalTheme) {
+        setThemeGenerating(true)
         try {
           const themeResult = await api.generateTheme({
             topic: aiTopics.trim(),
@@ -232,6 +233,8 @@ export default function SoloPlay() {
           applyTheme(themeResult.theme)
         } catch (themeError) {
           console.warn('Theme generation failed', themeError)
+        } finally {
+          setThemeGenerating(false)
         }
       }
 
@@ -340,7 +343,7 @@ export default function SoloPlay() {
     }])
   }
 
-  const handleSubmitFeedback = async (questionIndex: number) => {
+  const handleSubmitFeedback = async (questionIndex: number, selectedChoiceOverride?: number | null) => {
     const question = questions[questionIndex]
     if (!question) return
 
@@ -350,6 +353,8 @@ export default function SoloPlay() {
       return
     }
 
+    const selectedChoice = selectedChoiceOverride ?? selectedAnswer ?? null
+
     setFeedbackSending(questionIndex)
     try {
       await api.submitSoloFeedback({
@@ -357,7 +362,7 @@ export default function SoloPlay() {
         options: question.options,
         message,
         feedbackType: feedbackTypeByQuestion[questionIndex] || 'question',
-        selectedChoice: selectedAnswer ?? null,
+        selectedChoice,
         correctChoice: question.correct
       })
       setFeedbackSent(prev => ({ ...prev, [questionIndex]: true }))
@@ -413,6 +418,7 @@ export default function SoloPlay() {
   const currentQuestion = questions[currentIndex]
   const correctCount = answers.filter(a => a.correct).length
   const accuracy = answers.length > 0 ? Math.round((correctCount / answers.length) * 100) : 0
+  const generationActive = aiGenerating || themeGenerating
 
   // Setup Phase
   if (phase === 'setup') {
@@ -630,13 +636,29 @@ export default function SoloPlay() {
           {/* Start Button */}
           <button
             onClick={startGame}
-            disabled={questions.length === 0}
+            disabled={questions.length === 0 || generationActive}
             className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
           >
-            🎮 Start Solo Quiz!
+            {generationActive ? 'Preparing...' : '🎮 Start Solo Quiz!'}
           </button>
         </div>
       </div>
+
+      {generationActive && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
+            <div className="text-3xl mb-3">⏳</div>
+            <h3 className="text-lg font-bold">Preparing your quiz</h3>
+            <p className="text-white/60 text-sm mt-1">
+              {aiGenerating && themeGenerating
+                ? 'Generating questions and theme...'
+                : aiGenerating
+                  ? 'Generating questions...'
+                  : 'Generating theme...'}
+            </p>
+          </div>
+        </div>
+      )}
     )
   }
 
@@ -863,6 +885,41 @@ export default function SoloPlay() {
                         Correct: {q.options[q.correct]}
                       </p>
                     )}
+
+                    <div className="mt-3 pt-3 border-t border-white/10">
+                      <div className="flex items-center gap-2 mb-2">
+                        <label className="text-xs text-white/60">Feedback about</label>
+                        <select
+                          value={feedbackTypeByQuestion[answer.questionIndex] || 'question'}
+                          onChange={(e) => setFeedbackTypeByQuestion(prev => ({ ...prev, [answer.questionIndex]: e.target.value }))}
+                          className="bg-white/10 border border-white/20 rounded-md text-xs px-2 py-1"
+                          disabled={feedbackSent[answer.questionIndex]}
+                        >
+                          <option value="question">Question</option>
+                          <option value="answer">Answer</option>
+                          <option value="both">Both</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <textarea
+                        value={feedbackByQuestion[answer.questionIndex] || ''}
+                        onChange={(e) => setFeedbackByQuestion(prev => ({ ...prev, [answer.questionIndex]: e.target.value }))}
+                        placeholder="Tell us what's unclear or incorrect..."
+                        rows={2}
+                        className="w-full text-xs px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-secondary focus:outline-none"
+                        disabled={feedbackSent[answer.questionIndex]}
+                      />
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-xs text-white/40">Feedback goes to backend logs</span>
+                        <button
+                          onClick={() => handleSubmitFeedback(answer.questionIndex, answer.selected)}
+                          disabled={feedbackSent[answer.questionIndex] || feedbackSending === answer.questionIndex}
+                          className="px-3 py-1 text-xs font-semibold rounded-lg bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {feedbackSent[answer.questionIndex] ? 'Sent' : feedbackSending === answer.questionIndex ? 'Sending...' : 'Send'}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )
               })}
