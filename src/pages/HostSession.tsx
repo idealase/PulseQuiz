@@ -99,7 +99,8 @@ export default function HostSession() {
   const hostPlayerId = code ? sessionStorage.getItem(`host_player_${code}`) : null
   const hostPlayerName = code ? sessionStorage.getItem(`host_player_name_${code}`) : null
   const isHostPlayer = Boolean(hostPlayerId && hostRole !== 'host_only')
-  const authToken = localStorage.getItem('quiz_auth_token') || ''
+  const [authToken, setAuthToken] = useState(localStorage.getItem('quiz_auth_token') || '')
+  const [showAuthTokenInput, setShowAuthTokenInput] = useState(false)
   const api = new ApiClient(config.apiBaseUrl)
 
   const shouldGuard = Boolean(session && code && hostToken)
@@ -556,10 +557,21 @@ export default function HostSession() {
     setChallengeLoading(false)
   }
 
+  const handleSaveAuthToken = (token: string) => {
+    const trimmed = token.trim()
+    if (trimmed) {
+      setAuthToken(trimmed)
+      localStorage.setItem('quiz_auth_token', trimmed)
+      setShowAuthTokenInput(false)
+      setChallengeError(null)
+    }
+  }
+
   const handleAIVerify = async () => {
     if (!code || !hostToken || selectedChallengeIndex === null) return
     if (!authToken) {
-      setChallengeError('No auth token - please set access code in Host Create page')
+      setShowAuthTokenInput(true)
+      setChallengeError('An auth token is required for AI features. Enter it below.')
       return
     }
     setAiVerificationLoading(true)
@@ -1417,6 +1429,39 @@ export default function HostSession() {
                         </div>
                       ) : (
                         <p className="text-white/50 text-sm">No AI verification yet.</p>
+                      )}
+                      {showAuthTokenInput && (
+                        <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 space-y-2">
+                          <label className="text-xs text-yellow-200 block">Enter AI Auth Token</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="password"
+                              placeholder="Auth token / access code"
+                              className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary/50"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleSaveAuthToken((e.target as HTMLInputElement).value)
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={(e) => {
+                                const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement)
+                                if (input) handleSaveAuthToken(input.value)
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => { setShowAuthTokenInput(false); setChallengeError(null) }}
+                              className="px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 text-sm hover:bg-white/20"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                          <p className="text-xs text-white/40">This is the QUIZ_AUTH_SECRET from your server environment, or the access code set during host creation.</p>
+                        </div>
                       )}
                       <div className="flex flex-wrap gap-2">
                         <button
