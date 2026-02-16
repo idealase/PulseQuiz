@@ -2365,7 +2365,6 @@ async def dev_info():
     return {
         "copilot_sdk_available": COPILOT_SDK_AVAILABLE,
         "copilot_module_info": COPILOT_MODULE_INFO,
-        "copilot_cli_path": cli_path,
         "active_model": model,
         "valid_models": valid_models,
         "auth_configured": bool(QUIZ_AUTH_SECRET),

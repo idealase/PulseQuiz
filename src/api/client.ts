@@ -75,7 +75,6 @@ export interface AIMeta {
 export interface DevInfo {
   copilot_sdk_available: boolean
   copilot_module_info: string
-  copilot_cli_path: string | null
   active_model: string
   valid_models: string[]
   auth_configured: boolean

@@ -50,7 +50,7 @@ function ConsolePanel({ logs, clearLogs }: { logs: DevLogEntry[]; clearLogs: () 
           <button
             key={lvl}
             onClick={(e) => { e.stopPropagation(); setFilter(lvl) }}
-            className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider transition-colors ${
+            className={`px-2 py-0.5 rounded text-xs uppercase tracking-wider transition-colors ${
               filter === lvl
                 ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
                 : 'text-gray-500 hover:text-gray-300'
@@ -120,9 +120,10 @@ export default function DevLogOverlay() {
   const counts = { log: 0, warn: 0, error: 0, info: 0, debug: 0 }
   for (const l of logs) counts[l.level]++
 
-  return (
-    <div
-      className="fixed bottom-0 left-0 right-0 z-[9999] font-mono text-xs"
+  return (    <>
+    {/* Spacer to prevent page content from being hidden behind the fixed overlay */}
+    <div className="h-12" />    <div
+      className="fixed bottom-0 left-0 right-0 z-[9999] font-mono text-sm"
       style={{ pointerEvents: 'auto' }}
     >
       {/* Title bar */}
@@ -131,11 +132,11 @@ export default function DevLogOverlay() {
         onClick={() => setCollapsed(c => !c)}
       >
         <div className="flex items-center gap-2">
-          <span className="text-yellow-400 font-bold text-sm">⚙ DEV</span>
+          <span className="text-yellow-400 font-bold text-base">⚙ DEV</span>
           {/* Tab switcher */}
           <button
             onClick={(e) => { e.stopPropagation(); setActiveTab('console'); setCollapsed(false) }}
-            className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider transition-colors ${
+            className={`px-2 py-0.5 rounded text-xs uppercase tracking-wider transition-colors ${
               activeTab === 'console' ? 'bg-yellow-500/20 text-yellow-300' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -143,7 +144,7 @@ export default function DevLogOverlay() {
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); setActiveTab('ai'); setCollapsed(false) }}
-            className={`px-2 py-0.5 rounded text-[10px] uppercase tracking-wider transition-colors ${
+            className={`px-2 py-0.5 rounded text-xs uppercase tracking-wider transition-colors ${
               activeTab === 'ai' ? 'bg-cyan-500/20 text-cyan-300' : 'text-gray-500 hover:text-gray-300'
             }`}
           >
@@ -168,5 +169,6 @@ export default function DevLogOverlay() {
         </div>
       )}
     </div>
+    </>
   )
 }
