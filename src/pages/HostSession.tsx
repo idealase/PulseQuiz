@@ -81,6 +81,9 @@ export default function HostSession() {
   const [hostAnswerLocked, setHostAnswerLocked] = useState(false)
   const hostQuestionShownAtRef = useRef(Date.now())
 
+  // Share link state
+  const [copiedLink, setCopiedLink] = useState<string | null>(null)
+
   // Host controls and presentation
   const [hostControlsMode, setHostControlsMode] = useState<'hidden' | 'compact' | 'full'>('full')
   const [presentationMode, setPresentationMode] = useState(false)
@@ -622,7 +625,25 @@ export default function HostSession() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
+            <button
+              onClick={() => {
+                const link = `${window.location.origin}/join/${code}`
+                navigator.clipboard.writeText(link)
+                setCopiedLink('header')
+                setTimeout(() => setCopiedLink(null), 2000)
+              }}
+              className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors text-white/60 hover:text-white"
+              title="Copy join link"
+            >
+              {copiedLink === 'header' ? (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-400" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 001.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" /></svg>
+              )}
+            </button>
+          </div>
           {isHostPlayer && (
             <p className="text-white/60 text-sm">Playing as {hostDisplayName}</p>
           )}
@@ -738,6 +759,59 @@ export default function HostSession() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Share Links */}
+          <div className="bg-white/10 rounded-2xl p-6">
+            <h2 className="text-lg font-bold mb-3">Share Links</h2>
+            <div className="space-y-3">
+              {/* Player join link */}
+              <div>
+                <label className="block text-white/50 text-xs mb-1">Player Join Link</label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-black/30 rounded-lg text-sm text-white/80 truncate">
+                    {`${window.location.origin}/join/${code}`}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/join/${code}`)
+                      setCopiedLink('player')
+                      setTimeout(() => setCopiedLink(null), 2000)
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      copiedLink === 'player'
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/50'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80 border border-white/20'
+                    }`}
+                  >
+                    {copiedLink === 'player' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              {/* Audience watch link */}
+              <div>
+                <label className="block text-white/50 text-xs mb-1">Audience Watch Link</label>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 px-3 py-2 bg-black/30 rounded-lg text-sm text-white/80 truncate">
+                    {`${window.location.origin}/watch/${code}`}
+                  </code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/watch/${code}`)
+                      setCopiedLink('audience')
+                      setTimeout(() => setCopiedLink(null), 2000)
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                      copiedLink === 'audience'
+                        ? 'bg-green-500/20 text-green-300 border border-green-500/50'
+                        : 'bg-white/10 hover:bg-white/20 text-white/80 border border-white/20'
+                    }`}
+                  >
+                    {copiedLink === 'audience' ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="text-center text-white/60">
