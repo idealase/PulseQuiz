@@ -25,6 +25,7 @@ export default function GlobalNav() {
       <div className="fixed top-4 right-4 z-50">
         <Link
           to="/settings"
+          state={{ from: location.pathname }}
           aria-label="Settings"
           className={`inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-lg transition-all ${
             isSettings

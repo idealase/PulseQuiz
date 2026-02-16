@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useTheme } from '../context/ThemeContext'
 import { useDevMode } from '../context/DevModeContext'
 
 export default function Settings() {
+  const navigate = useNavigate()
+  const location = useLocation()
+  const fromPath = (location.state as { from?: string })?.from
   const {
     theme,
     lockTheme,
@@ -33,11 +37,30 @@ export default function Settings() {
     localStorage.setItem('pref_show_hints', String(showHints))
   }, [showHints])
 
+  const handleBack = () => {
+    if (fromPath) {
+      navigate(fromPath)
+    } else {
+      navigate(-1)
+    }
+  }
+
   return (
     <div className="min-h-[100dvh] px-3 py-4 sm:p-6 max-w-lg mx-auto">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold">Settings</h1>
-        <p className="text-white/60 mt-2">Customize your experience</p>
+      <div className="mb-8">
+        <button
+          onClick={handleBack}
+          className="inline-flex items-center gap-2 text-white/70 hover:text-white transition-colors mb-4"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+          </svg>
+          <span className="text-sm font-medium">Back</span>
+        </button>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold">Settings</h1>
+          <p className="text-white/60 mt-2">Customize your experience</p>
+        </div>
       </div>
 
       <div className="space-y-4">
