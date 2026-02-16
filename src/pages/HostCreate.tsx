@@ -409,52 +409,6 @@ export default function HostCreate() {
         </div>
       ) : (
         <div className="space-y-6 animate-slide-up">
-          {/* Session Code Display */}
-          <div className="bg-white/10 rounded-2xl p-6 text-center">
-            <p className="text-white/60 mb-2">Session Code</p>
-            <p className="text-5xl font-mono font-bold tracking-wider text-secondary">
-              {sessionCode}
-            </p>
-          </div>
-
-          {/* QR Code */}
-          <div className="bg-white rounded-2xl p-6 flex flex-col items-center">
-            <QRCodeSVG value={joinUrl} size={180} level="M" />
-            <p className="text-gray-600 text-sm mt-3">Scan to join</p>
-          </div>
-
-          {/* CSV Upload */}
-          <div
-            onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
-              dragActive 
-                ? 'border-primary bg-primary/10' 
-                : 'border-white/30 hover:border-white/50'
-            }`}
-          >
-            <input
-              type="file"
-              accept=".csv"
-              onChange={handleFileSelect}
-              className="hidden"
-              id="csv-upload"
-            />
-            <label htmlFor="csv-upload" className="cursor-pointer">
-              <div className="text-4xl mb-2">📄</div>
-              <p className="font-medium">
-                {questions.length > 0 
-                  ? `${questions.length} questions loaded`
-                  : 'Drop CSV or tap to upload'
-                }
-              </p>
-              <p className="text-white/50 text-sm mt-1">
-                Menti-style format
-              </p>
-            </label>
-          </div>
-
           {/* AI Quiz Generation */}
           <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-2xl p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
@@ -603,6 +557,52 @@ export default function HostCreate() {
               ))}
             </div>
           </details>
+
+          {/* CSV Upload */}
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
+              dragActive 
+                ? 'border-primary bg-primary/10' 
+                : 'border-white/30 hover:border-white/50'
+            }`}
+          >
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileSelect}
+              className="hidden"
+              id="csv-upload"
+            />
+            <label htmlFor="csv-upload" className="cursor-pointer">
+              <div className="text-4xl mb-2">📄</div>
+              <p className="font-medium">
+                {questions.length > 0 
+                  ? `${questions.length} questions loaded`
+                  : 'Drop CSV or tap to upload'
+                }
+              </p>
+              <p className="text-white/50 text-sm mt-1">
+                Menti-style format
+              </p>
+            </label>
+          </div>
+
+          {/* Session Code Display */}
+          <div className="bg-white/10 rounded-2xl p-6 text-center">
+            <p className="text-white/60 mb-2">Session Code</p>
+            <p className="text-5xl font-mono font-bold tracking-wider text-secondary">
+              {sessionCode}
+            </p>
+          </div>
+
+          {/* QR Code */}
+          <div className="bg-white rounded-2xl p-6 flex flex-col items-center">
+            <QRCodeSVG value={joinUrl} size={180} level="M" />
+            <p className="text-gray-600 text-sm mt-3">Scan to join</p>
+          </div>
 
           {/* CSV Errors */}
           {csvErrors.length > 0 && (
