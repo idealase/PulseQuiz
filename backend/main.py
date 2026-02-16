@@ -10,6 +10,7 @@ import asyncio
 import time
 import os
 import re
+import random
 import logging
 import traceback
 import sys
@@ -253,6 +254,7 @@ RULES:
 4. Mix difficulty levels unless specified
 5. Questions should be educational and engaging
 6. Avoid controversial, political, or sensitive topics
+7. IMPORTANT: Randomize where the correct answer appears! Do NOT always put the correct answer as option A. Spread correct answers evenly across positions 0, 1, 2, and 3.
 
 OUTPUT FORMAT - Return ONLY valid JSON (no markdown, no explanation):
 {
@@ -260,13 +262,13 @@ OUTPUT FORMAT - Return ONLY valid JSON (no markdown, no explanation):
     {
       "question": "The question text?",
       "options": ["Option A", "Option B", "Option C", "Option D"],
-      "correct": 0,
+      "correct": 2,
       "points": 1
     }
   ]
 }
 
-The "correct" field is the 0-based index of the correct answer (0=A, 1=B, 2=C, 3=D)."""
+The "correct" field is the 0-based index of the correct answer (0=A, 1=B, 2=C, 3=D). Vary this across questions!"""
 
 THEME_SYSTEM_PROMPT = """You are a UI theme planner. Return ONLY JSON with theme_id and deltas.
 
@@ -349,10 +351,18 @@ def parse_questions_from_response(content: str) -> List[Question]:
         questions = []
         for i, q in enumerate(questions_data):
             try:
+                options = list(q['options'][:4])  # Ensure max 4 options
+                correct_idx = min(q['correct'], len(options) - 1)
+                correct_answer = options[correct_idx]
+                
+                # Shuffle options so the correct answer isn't always in the same position
+                random.shuffle(options)
+                new_correct_idx = options.index(correct_answer)
+                
                 question = Question(
                     question=q['question'],
-                    options=q['options'][:4],  # Ensure max 4 options
-                    correct=min(q['correct'], 3),  # Ensure valid index
+                    options=options,
+                    correct=new_correct_idx,
                     points=q.get('points', 1),
                     explanation=q.get('explanation')
                 )

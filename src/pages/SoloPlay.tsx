@@ -376,8 +376,17 @@ export default function SoloPlay() {
   }
 
   const playAgain = () => {
-    // Shuffle questions for replay
-    const shuffled = [...questions].sort(() => Math.random() - 0.5)
+    // Shuffle questions and randomize answer order for replay
+    const shuffled = [...questions].map(q => {
+      const options = [...q.options]
+      const correctAnswer = options[q.correct]
+      // Fisher-Yates shuffle for options
+      for (let i = options.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [options[i], options[j]] = [options[j], options[i]]
+      }
+      return { ...q, options, correct: options.indexOf(correctAnswer) }
+    }).sort(() => Math.random() - 0.5)
     setQuestions(shuffled)
     startGame()
   }
