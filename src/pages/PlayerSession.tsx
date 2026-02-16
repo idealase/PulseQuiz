@@ -145,6 +145,18 @@ export default function PlayerSession() {
             applyTheme(msg.state.theme, false)
           }
           break
+        case 'player_joined':
+          setSession(prev => prev ? {
+            ...prev,
+            players: [...prev.players, msg.player]
+          } : null)
+          break
+        case 'player_left':
+          setSession(prev => prev ? {
+            ...prev,
+            players: prev.players.filter(p => p.id !== msg.playerId)
+          } : null)
+          break
         case 'theme_updated':
           applyTheme(msg.theme, false)
           break
