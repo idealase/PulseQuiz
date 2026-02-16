@@ -719,15 +719,20 @@ export default function HostSession() {
                 onMouseDown={startHoldUnlock}
                 onMouseUp={endHoldUnlock}
                 onMouseLeave={endHoldUnlock}
+                onTouchStart={(e) => { e.preventDefault(); startHoldUnlock() }}
+                onTouchEnd={endHoldUnlock}
+                onTouchCancel={endHoldUnlock}
+                onContextMenu={(e) => e.preventDefault()}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') startHoldUnlock()
                 }}
                 onKeyUp={endHoldUnlock}
-                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors select-none ${
                   hostControlsMode === 'full'
                     ? 'bg-white/20 border-white/30'
                     : 'bg-amber-500/10 border-amber-500/40 hover:bg-amber-500/20'
                 }`}
+                style={{ touchAction: 'manipulation', WebkitUserSelect: 'none' }}
                 aria-label="Hold to unlock full controls"
               >
                 {hostControlsMode === 'full' ? 'Full' : holdUnlockActive ? 'Hold…' : 'Hold for Full'}
