@@ -1761,12 +1761,12 @@ async def ai_verify_challenge(
 
     question = session.questions[question_index]
 
-    # Include player challenge reasons for context
+    # Include player challenge notes for context
     challenge_submissions = session.challenges.get(question_index, {})
     challenge_reasons = []
     for sub in challenge_submissions.values():
-        if sub.reason:
-            challenge_reasons.append(sub.reason)
+        if sub.note:
+            challenge_reasons.append(sub.note)
 
     prompt = (
         "Review this trivia question and decide if the provided correct answer is valid. "

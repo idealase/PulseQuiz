@@ -176,8 +176,19 @@ export class ApiClient {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ detail: 'Unknown error' }))
-      throw new Error(error.detail || `HTTP ${response.status}`)
+      let detail: string
+      try {
+        const error = await response.json()
+        detail = typeof error.detail === 'string'
+          ? error.detail
+          : Array.isArray(error.detail)
+            ? error.detail.map((d: { msg?: string }) => d.msg || JSON.stringify(d)).join('; ')
+            : `HTTP ${response.status}`
+      } catch {
+        const text = await response.text().catch(() => '')
+        detail = text ? `HTTP ${response.status}: ${text.slice(0, 200)}` : `HTTP ${response.status} ${response.statusText}`
+      }
+      throw new Error(detail)
     }
 
     return response.json()
