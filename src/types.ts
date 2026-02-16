@@ -76,6 +76,7 @@ export interface SessionState {
   roundSize: number
   settings: GameSettings
   timerRemaining?: number
+  theme?: ThemeSpec | null
 }
 
 export interface AnswerStatus {
@@ -121,6 +122,7 @@ export type ServerMessage =
   | { type: 'challenge_ai_verified'; questionIndex: number; aiVerification: AIVerification }
   | { type: 'challenge_ai_published'; questionIndex: number; aiVerification: AIVerification }
   | { type: 'scores_reconciled'; questionIndex: number; policy: ReconciliationPolicy; deltas: Record<string, number> }
+  | { type: 'theme_updated'; theme: ThemeSpec }
   | { type: 'error'; message: string }
 
 export interface RevealResults {

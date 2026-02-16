@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
+import { useTheme } from '../context/ThemeContext'
 import { ApiClient, createSmartConnection } from '../api/client'
 import { SessionState, ServerMessage, RevealResults, LiveLeaderboardEntry, QuestionStats } from '../types'
 import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
@@ -9,6 +10,7 @@ export default function AudienceSession() {
   const { code } = useParams<{ code: string }>()
   const config = useConfig()
   const navigate = useNavigate()
+  const { applyTheme } = useTheme()
   
   const [session, setSession] = useState<SessionState | null>(null)
   const [results, setResults] = useState<RevealResults | null>(null)
@@ -41,6 +43,10 @@ export default function AudienceSession() {
           if (msg.state.timerRemaining !== undefined) {
             setTimerRemaining(msg.state.timerRemaining)
           }
+          // Apply host theme if present
+          if (msg.state.theme) {
+            applyTheme(msg.state.theme, false)
+          }
           // Handle initial leaderboard from session_state
           if ('leaderboard' in msg && Array.isArray(msg.leaderboard)) {
             setLeaderboard(msg.leaderboard as LiveLeaderboardEntry[])
@@ -49,6 +55,9 @@ export default function AudienceSession() {
           if ('stats' in msg && msg.stats) {
             setQuestionStats(msg.stats as QuestionStats)
           }
+          break
+        case 'theme_updated':
+          applyTheme(msg.theme, false)
           break
         case 'player_joined':
           setSession(prev => prev ? {
