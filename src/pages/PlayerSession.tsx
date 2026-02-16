@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { useTheme } from '../context/ThemeContext'
 import { ApiClient, createSmartConnection } from '../api/client'
-import { SessionState, ServerMessage, RevealResults, QuestionResult, ChallengeThread, ChallengeReply } from '../types'
+import { SessionState, ServerMessage, RevealResults, QuestionResult, ChallengeThread } from '../types'
 import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 
 export default function PlayerSession() {
