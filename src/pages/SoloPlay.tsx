@@ -423,7 +423,8 @@ export default function SoloPlay() {
   // Setup Phase
   if (phase === 'setup') {
     return (
-      <div className="min-h-screen p-6">
+      <>
+        <div className="min-h-screen p-6">
         <div className="max-w-2xl mx-auto">
           <Link to="/" className="text-white/60 hover:text-white mb-6 inline-block">
             ← Back
@@ -642,23 +643,24 @@ export default function SoloPlay() {
             {generationActive ? 'Preparing...' : '🎮 Start Solo Quiz!'}
           </button>
         </div>
-      </div>
-
-      {generationActive && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
-            <div className="text-3xl mb-3">⏳</div>
-            <h3 className="text-lg font-bold">Preparing your quiz</h3>
-            <p className="text-white/60 text-sm mt-1">
-              {aiGenerating && themeGenerating
-                ? 'Generating questions and theme...'
-                : aiGenerating
-                  ? 'Generating questions...'
-                  : 'Generating theme...'}
-            </p>
-          </div>
         </div>
-      )}
+
+        {generationActive && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
+              <div className="text-3xl mb-3">⏳</div>
+              <h3 className="text-lg font-bold">Preparing your quiz</h3>
+              <p className="text-white/60 text-sm mt-1">
+                {aiGenerating && themeGenerating
+                  ? 'Generating questions and theme...'
+                  : aiGenerating
+                    ? 'Generating questions...'
+                    : 'Generating theme...'}
+              </p>
+            </div>
+          </div>
+        )}
+      </>
     )
   }
 
