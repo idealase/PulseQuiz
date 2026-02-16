@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTheme } from '../context/ThemeContext'
+import { useDevMode } from '../context/DevModeContext'
 
 export default function Settings() {
   const {
@@ -12,6 +13,7 @@ export default function Settings() {
     setIntensity,
     setExperimentalTheme
   } = useTheme()
+  const { devMode, setDevMode } = useDevMode()
   const [reduceMotion, setReduceMotion] = useState(false)
   const [showHints, setShowHints] = useState(true)
 
@@ -103,6 +105,19 @@ export default function Settings() {
             checked={showHints}
             onChange={(e) => setShowHints(e.target.checked)}
             className="h-5 w-5 accent-primary"
+          />
+        </label>
+
+        <label className="flex items-center justify-between rounded-2xl bg-yellow-500/10 border border-yellow-500/30 px-4 py-4">
+          <div>
+            <p className="font-semibold text-yellow-300">Dev Mode</p>
+            <p className="text-sm text-white/50">Show verbose console output in an on-screen overlay</p>
+          </div>
+          <input
+            type="checkbox"
+            checked={devMode}
+            onChange={(e) => setDevMode(e.target.checked)}
+            className="h-5 w-5 accent-yellow-400"
           />
         </label>
       </div>

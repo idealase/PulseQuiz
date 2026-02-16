@@ -1,6 +1,8 @@
 import { Routes, Route } from 'react-router-dom'
 import { ConfigProvider } from './context/ConfigContext'
 import { ThemeProvider } from './context/ThemeContext'
+import { DevModeProvider } from './context/DevModeContext'
+import DevLogOverlay from './components/DevLogOverlay'
 import GlobalNav from './components/GlobalNav'
 import Landing from './pages/Landing'
 import HostCreate from './pages/HostCreate'
@@ -14,6 +16,7 @@ import Settings from './pages/Settings'
 
 function App() {
   return (
+    <DevModeProvider>
     <ConfigProvider>
       <ThemeProvider>
         <div className="min-h-screen text-white">
@@ -31,9 +34,11 @@ function App() {
             <Route path="/audience/:code" element={<AudienceSession />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
+          <DevLogOverlay />
         </div>
       </ThemeProvider>
     </ConfigProvider>
+    </DevModeProvider>
   )
 }
 
