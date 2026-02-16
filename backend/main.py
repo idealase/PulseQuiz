@@ -1543,12 +1543,17 @@ async def get_challenge_thread(code: str, question_index: int, player_id: str = 
     # Sort by createdAt
     thread_entries.sort(key=lambda e: e["createdAt"])
 
+    # Include AI verification if published
+    ai_verification = session.ai_verifications.get(question_index)
+    include_ai = ai_verification.model_dump() if ai_verification and ai_verification.published else None
+
     return {
         "questionIndex": question_index,
         "question": session.questions[question_index].question,
         "challengeCount": len(submissions),
         "status": resolution.status if resolution else "open",
         "resolution": resolution.model_dump() if resolution and resolution.published else None,
+        "aiVerification": include_ai,
         "thread": thread_entries,
     }
 
@@ -1633,6 +1638,60 @@ async def reply_to_challenge(code: str, request: ChallengeReplyRequest):
     })
 
     log_game_event("challenge_reply", session_code=code, player_id=request.playerId, data={
+        "question_index": request.questionIndex,
+    })
+
+    return {"ok": True, "reply": reply.model_dump()}
+
+
+class HostChallengeReplyRequest(BaseModel):
+    questionIndex: int
+    text: str
+
+
+@app.post("/api/session/{code}/challenges/host-reply")
+async def host_reply_to_challenge(
+    code: str,
+    request: HostChallengeReplyRequest,
+    x_host_token: str = Header(alias="X-Host-Token"),
+):
+    """Add a reply to a challenge thread as the host (no player ID required)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if session.host_token != x_host_token:
+        raise HTTPException(status_code=403, detail="Invalid host token")
+
+    if request.questionIndex < 0 or request.questionIndex >= len(session.questions):
+        raise HTTPException(status_code=400, detail="Invalid question index")
+
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Reply text cannot be empty")
+
+    submissions = session.challenges.get(request.questionIndex, {})
+    if not submissions:
+        raise HTTPException(status_code=404, detail="No challenges exist for this question")
+
+    reply = ChallengeReply(
+        replyId=generate_player_id(),
+        playerId="host",
+        nickname="Host",
+        text=request.text.strip(),
+        createdAt=time.time(),
+    )
+
+    first_submission = min(submissions.values(), key=lambda s: s.createdAt)
+    first_submission.replies.append(reply)
+
+    await broadcast_to_session(code, {
+        "type": "challenge_reply",
+        "questionIndex": request.questionIndex,
+        "reply": reply.model_dump(),
+        "totalReplies": sum(len(s.replies) for s in submissions.values()),
+    })
+
+    log_game_event("challenge_reply", session_code=code, player_id="host", data={
         "question_index": request.questionIndex,
     })
 

@@ -216,6 +216,10 @@ export default function PlayerSession() {
             resolutionVerdict: msg.resolution.verdict,
             resolutionNote: msg.resolution.resolutionNote
           } : q) : prev)
+          // Update thread data if the discussion modal is open for this question
+          setThreadData(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, resolution: msg.resolution, status: msg.resolution.status }
+            : prev)
           break
         case 'challenge_ai_published':
           setMyResults(prev => prev ? prev.map((q, index) => index === msg.questionIndex ? {
@@ -225,6 +229,10 @@ export default function PlayerSession() {
             aiRationale: msg.aiVerification.rationale,
             aiSuggestedCorrection: msg.aiVerification.suggested_correction
           } : q) : prev)
+          // Update thread data if the discussion modal is open for this question
+          setThreadData(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, aiVerification: msg.aiVerification }
+            : prev)
           break
         case 'scores_reconciled':
           setMyResults(prev => prev ? prev.map((q, index) => index === msg.questionIndex ? {
@@ -906,6 +914,37 @@ export default function PlayerSession() {
                   )}
                 </div>
               ))}
+
+              {/* AI Verification in thread */}
+              {!threadLoading && threadData?.aiVerification && (
+                <div className={`rounded-xl p-3 border ${
+                  threadData.aiVerification.verdict === 'valid'
+                    ? 'bg-green-500/10 border-green-400/30'
+                    : threadData.aiVerification.verdict === 'invalid'
+                    ? 'bg-red-500/10 border-red-400/30'
+                    : 'bg-amber-500/10 border-amber-400/30'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">🤖</span>
+                    <span className="font-bold text-xs text-white/90 uppercase tracking-wide">AI Verification</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      threadData.aiVerification.verdict === 'valid'
+                        ? 'bg-green-500/25 text-green-200'
+                        : threadData.aiVerification.verdict === 'invalid'
+                        ? 'bg-red-500/25 text-red-200'
+                        : 'bg-amber-500/25 text-amber-200'
+                    }`}>
+                      {threadData.aiVerification.verdict} &middot; {Math.round(threadData.aiVerification.confidence * 100)}%
+                    </span>
+                  </div>
+                  {threadData.aiVerification.rationale && (
+                    <p className="text-sm text-white/70 mt-1 pl-7 leading-relaxed">{threadData.aiVerification.rationale}</p>
+                  )}
+                  {threadData.aiVerification.suggested_correction && (
+                    <p className="text-xs text-white/50 mt-1 pl-7 italic">Suggested: {threadData.aiVerification.suggested_correction}</p>
+                  )}
+                </div>
+              )}
 
               {/* Resolution notice in thread */}
               {!threadLoading && threadData?.resolution && (

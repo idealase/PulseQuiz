@@ -329,6 +329,19 @@ export class ApiClient {
     })
   }
 
+  async hostReplyToChallenge(
+    code: string,
+    hostToken: string,
+    questionIndex: number,
+    text: string
+  ): Promise<{ ok: boolean; reply: ChallengeReply }> {
+    return this.request(`/api/session/${code}/challenges/host-reply`, {
+      method: 'POST',
+      headers: { 'X-Host-Token': hostToken },
+      body: JSON.stringify({ questionIndex, text })
+    })
+  }
+
   async getChallenges(code: string, hostToken: string): Promise<{ challenges: ChallengeSummary[] }> {
     return this.request(`/api/session/${code}/challenges`, {
       headers: { 'X-Host-Token': hostToken }

@@ -197,6 +197,7 @@ export interface ChallengeThread {
   challengeCount: number
   status: string
   resolution?: ChallengeResolution | null
+  aiVerification?: AIVerification | null
   thread: ChallengeThreadEntry[]
 }
 

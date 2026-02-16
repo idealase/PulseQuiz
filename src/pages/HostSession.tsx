@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { ApiClient, createSmartConnection } from '../api/client'
@@ -9,7 +9,8 @@ import {
   LiveLeaderboardEntry,
   QuestionStats,
   ChallengeSummary,
-  ChallengeDetail
+  ChallengeDetail,
+  ChallengeThread
 } from '../types'
 import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
 import { useAITelemetry } from '../context/AITelemetryContext'
@@ -65,6 +66,13 @@ export default function HostSession() {
   const [reconcilePolicy, setReconcilePolicy] = useState('void')
   const [reconcileAnswers, setReconcileAnswers] = useState('')
   
+  // Discussion thread state (host view)
+  const [threadOpen, setThreadOpen] = useState<number | null>(null) // questionIndex of open thread
+  const [threadData, setThreadData] = useState<ChallengeThread | null>(null)
+  const [threadLoading, setThreadLoading] = useState(false)
+  const [hostReplyText, setHostReplyText] = useState('')
+  const [hostReplySubmitting, setHostReplySubmitting] = useState(false)
+
   // Dynamic mode state
   const [dynamicConfig, setDynamicConfig] = useState<{
     enabled: boolean
@@ -251,10 +259,18 @@ export default function HostSession() {
           setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
             ? { ...prev, resolution: msg.resolution }
             : prev)
+          // Update thread data if discussion modal is open
+          setThreadData(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, resolution: msg.resolution, status: msg.resolution.status }
+            : prev)
           break
         case 'challenge_ai_verified':
         case 'challenge_ai_published':
           setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
+            ? { ...prev, aiVerification: msg.aiVerification }
+            : prev)
+          // Update thread data if discussion modal is open
+          setThreadData(prev => prev && prev.questionIndex === msg.questionIndex
             ? { ...prev, aiVerification: msg.aiVerification }
             : prev)
           break
@@ -262,6 +278,16 @@ export default function HostSession() {
           setChallengeDetail(prev => prev && prev.questionIndex === msg.questionIndex
             ? { ...prev, reconciliation: msg.policy }
             : prev)
+          break
+        case 'challenge_reply':
+          // Update the thread modal if it's open for this question
+          setThreadData(prev => {
+            if (!prev || prev.questionIndex !== msg.questionIndex) return prev
+            const updatedThread = prev.thread.map((entry, idx) =>
+              idx === 0 ? { ...entry, replies: [...entry.replies, msg.reply] } : entry
+            )
+            return { ...prev, thread: updatedThread }
+          })
           break
         case 'questions_updated':
           // Questions were appended mid-session; session_state will follow
@@ -630,6 +656,35 @@ export default function HostSession() {
       setChallengeError(e instanceof Error ? e.message : 'Failed to reconcile scores')
     }
     setChallengeLoading(false)
+  }
+
+  const openHostThread = useCallback(async (questionIndex: number) => {
+    if (!code) return
+    setThreadOpen(questionIndex)
+    setThreadLoading(true)
+    setHostReplyText('')
+    try {
+      const data = await api.getChallengeThread(code, questionIndex)
+      setThreadData(data)
+    } catch {
+      setThreadData(null)
+    }
+    setThreadLoading(false)
+  }, [code, api])
+
+  const submitHostReply = async () => {
+    if (!code || !hostToken || threadOpen === null || !hostReplyText.trim()) return
+    setHostReplySubmitting(true)
+    try {
+      await api.hostReplyToChallenge(code, hostToken, threadOpen, hostReplyText.trim())
+      setHostReplyText('')
+      // Refresh thread
+      const data = await api.getChallengeThread(code, threadOpen)
+      setThreadData(data)
+    } catch {
+      // silent
+    }
+    setHostReplySubmitting(false)
   }
 
   if (!session) {
@@ -1376,6 +1431,14 @@ export default function HostSession() {
                       </div>
                     </div>
 
+                    {/* View Discussion Thread button */}
+                    <button
+                      onClick={() => openHostThread(challengeDetail.questionIndex)}
+                      className="w-full text-sm py-2.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      💬 View Player Discussion
+                    </button>
+
                     <div className="space-y-2">
                       <h5 className="font-semibold">Resolution</h5>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -1547,6 +1610,167 @@ export default function HostSession() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Host Discussion Thread Modal */}
+      {threadOpen !== null && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-gray-900 border border-white/20 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
+            {/* Thread header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
+              <div>
+                <h3 className="font-bold text-base">Challenge Discussion</h3>
+                <p className="text-xs text-white/50">
+                  Q{threadOpen + 1}{threadData ? ` — ${threadData.status.replace(/_/g, ' ')}` : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => { setThreadOpen(null); setThreadData(null) }}
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Thread content */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
+              {threadLoading && (
+                <div className="text-center text-white/50 py-8 animate-pulse">Loading thread...</div>
+              )}
+
+              {!threadLoading && threadData && threadData.thread.length === 0 && (
+                <div className="text-center text-white/50 py-8">No challenges yet for this question.</div>
+              )}
+
+              {!threadLoading && threadData && threadData.thread.map((entry, idx) => (
+                <div key={idx} className="rounded-xl bg-white/5 border border-white/10 p-3">
+                  {/* Challenge submission */}
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg shrink-0 mt-0.5">🚩</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-sm text-white/90">{entry.nickname}</span>
+                        {entry.category && (
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300">{entry.category}</span>
+                        )}
+                        <span className="text-xs text-white/40 ml-auto shrink-0">
+                          {new Date(entry.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      {entry.note && (
+                        <p className="text-sm text-white/70 mt-1">{entry.note}</p>
+                      )}
+                      {!entry.note && (
+                        <p className="text-sm text-white/50 mt-1 italic">Challenged without comment</p>
+                      )}
+
+                      {/* Vote tally (read-only for host) */}
+                      <div className="flex items-center gap-3 mt-2">
+                        <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/50">
+                          👍 Agree
+                        </span>
+                        <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/50">
+                          👎 Disagree
+                        </span>
+                        <span className={`text-xs font-medium ${
+                          entry.voteScore > 0 ? 'text-green-400' : entry.voteScore < 0 ? 'text-red-400' : 'text-white/40'
+                        }`}>
+                          {entry.voteScore > 0 ? '+' : ''}{entry.voteScore}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Replies */}
+                  {entry.replies.length > 0 && (
+                    <div className="mt-3 ml-6 space-y-2 border-l-2 border-white/10 pl-3">
+                      {entry.replies.map((reply) => (
+                        <div key={reply.replyId} className="text-sm">
+                          <div className="flex items-center gap-2">
+                            <span className={`font-medium ${reply.playerId === 'host' ? 'text-primary' : 'text-white/80'}`}>
+                              {reply.nickname}{reply.playerId === 'host' ? ' (Host)' : ''}
+                            </span>
+                            <span className="text-xs text-white/40">
+                              {new Date(reply.createdAt * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <p className="text-white/60 mt-0.5">{reply.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              {/* AI Verification in thread */}
+              {!threadLoading && threadData?.aiVerification && (
+                <div className={`rounded-xl p-3 border ${
+                  threadData.aiVerification.verdict === 'valid'
+                    ? 'bg-green-500/10 border-green-400/30'
+                    : threadData.aiVerification.verdict === 'invalid'
+                    ? 'bg-red-500/10 border-red-400/30'
+                    : 'bg-amber-500/10 border-amber-400/30'
+                }`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-lg">🤖</span>
+                    <span className="font-bold text-xs text-white/90 uppercase tracking-wide">AI Verification</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      threadData.aiVerification.verdict === 'valid'
+                        ? 'bg-green-500/25 text-green-200'
+                        : threadData.aiVerification.verdict === 'invalid'
+                        ? 'bg-red-500/25 text-red-200'
+                        : 'bg-amber-500/25 text-amber-200'
+                    }`}>
+                      {threadData.aiVerification.verdict} &middot; {Math.round(threadData.aiVerification.confidence * 100)}%
+                    </span>
+                  </div>
+                  {threadData.aiVerification.rationale && (
+                    <p className="text-sm text-white/70 mt-1 pl-7 leading-relaxed">{threadData.aiVerification.rationale}</p>
+                  )}
+                  {threadData.aiVerification.suggested_correction && (
+                    <p className="text-xs text-white/50 mt-1 pl-7 italic">Suggested: {threadData.aiVerification.suggested_correction}</p>
+                  )}
+                </div>
+              )}
+
+              {/* Resolution notice */}
+              {!threadLoading && threadData?.resolution && (
+                <div className="rounded-xl bg-green-500/10 border border-green-400/30 p-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">⚖️</span>
+                    <span className="font-bold text-sm text-green-300 uppercase">
+                      Resolution: {threadData.resolution.verdict || threadData.resolution.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  {threadData.resolution.resolutionNote && (
+                    <p className="text-sm text-white/70 mt-1 pl-7 italic">"{threadData.resolution.resolutionNote}"</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Host reply input */}
+            <div className="border-t border-white/10 p-3 shrink-0">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={hostReplyText}
+                  onChange={(e) => setHostReplyText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitHostReply() } }}
+                  placeholder="Reply as Host..."
+                  className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-2 text-sm placeholder-white/40 focus:outline-none focus:border-white/40"
+                />
+                <button
+                  onClick={submitHostReply}
+                  disabled={!hostReplyText.trim() || hostReplySubmitting}
+                  className="px-4 py-2 rounded-lg bg-primary/80 hover:bg-primary text-sm font-medium disabled:opacity-40 transition-all shrink-0"
+                >
+                  {hostReplySubmitting ? '...' : 'Send'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
