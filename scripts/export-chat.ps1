@@ -34,45 +34,41 @@ if (-not (Test-Path $chatDir)) {
     New-Item -ItemType Directory -Path $chatDir -Force | Out-Null
 }
 
-# Derive a slug from the first user message in the transcript
+# Derive a slug from the first user message in the transcript.
+# The transcript is NDJSON (one JSON object per line).
+# User messages have: {"type":"user.message","data":{"content":"..."}}
 $slug = 'session'
+$stopWords = @('a','an','the','is','it','in','on','at','to','for','of','and','or','but','with',
+    'that','this','was','are','be','has','have','had','do','does','did','will','would','could',
+    'should','can','may','might','i','you','we','they','he','she','my','your','our','its',
+    'me','us','them','not','no','so','if','just','also','very','really','about','from','into',
+    'up','out','how','what','when','where','why','who','which','there','here','then','than',
+    'been','being','some','all','any','each','every','both','few','more','most','other',
+    'please','think','make','made','want','like','use','get','go','know','see','look',
+    'way','take','come','could','after','before','now','new','one','two','let','lets')
 try {
-    $transcript = Get-Content -Raw -Path $transcriptPath | ConvertFrom-Json
-    # Look for the first user/human message
+    $lines = Get-Content -Path $transcriptPath
     $firstMsg = $null
-    foreach ($entry in $transcript) {
-        $role = $entry.role
-        if (-not $role) { $role = $entry.type }
-        if ($role -match 'user|human') {
-            $firstMsg = $entry.content
-            if (-not $firstMsg) { $firstMsg = $entry.text }
-            if (-not $firstMsg) { $firstMsg = $entry.message }
+    foreach ($line in $lines) {
+        if (-not $line.Trim()) { continue }
+        try {
+            $entry = $line | ConvertFrom-Json
+        } catch { continue }
+        if ($entry.type -eq 'user.message' -and $entry.data -and $entry.data.content) {
+            $firstMsg = $entry.data.content
             break
         }
     }
-    # Also try .messages[] shape
-    if (-not $firstMsg -and $transcript.messages) {
-        foreach ($msg in $transcript.messages) {
-            if ($msg.role -match 'user|human') {
-                $firstMsg = $msg.content
-                if (-not $firstMsg) { $firstMsg = $msg.text }
-                break
-            }
+    if ($firstMsg) {
+        # Extract keywords: split on non-alpha, filter stop words, take first 5
+        $words = ($firstMsg.ToLower() -replace '[^a-z0-9\s]', ' ' -split '\s+') |
+            Where-Object { $_ -and $_.Length -ge 3 -and $_ -notin $stopWords } |
+            Select-Object -Unique -First 5
+        if ($words.Count -gt 0) {
+            $slug = ($words -join '-')
         }
     }
-    # Also try .title at the top level
-    if (-not $firstMsg -and $transcript.title) {
-        $firstMsg = $transcript.title
-    }
-    if ($firstMsg) {
-        # Take first 50 chars, lowercase, replace non-alphanum with hyphens, collapse
-        $slug = $firstMsg.Substring(0, [Math]::Min(50, $firstMsg.Length)).ToLower()
-        $slug = $slug -replace '[^a-z0-9]+', '-'
-        $slug = $slug.Trim('-')
-        if (-not $slug) { $slug = 'session' }
-    }
 } catch {
-    # Fall back to generic name on any parse error
     $slug = 'session'
 }
 
