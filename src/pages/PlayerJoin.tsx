@@ -42,11 +42,11 @@ export default function PlayerJoin() {
   }
 
   return (
-    <div className="h-[100dvh] flex flex-col items-center justify-center px-4 py-3 sm:p-6">
-      <div className="w-full max-w-sm animate-slide-up">
-        <h1 className="text-3xl font-bold text-center mb-8">Join Game</h1>
+    <div className="h-[100dvh] flex flex-col items-center justify-center px-5 py-3 sm:p-6">
+      <div className="w-full max-w-md animate-slide-up">
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8">Join Game</h1>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-white/60 text-sm mb-2">Session Code</label>
             <input
@@ -84,7 +84,7 @@ export default function PlayerJoin() {
           <button
             type="submit"
             disabled={loading || !code.trim() || !nickname.trim()}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-lg sm:text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Joining...' : 'Join'}
           </button>

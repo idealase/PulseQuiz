@@ -142,7 +142,7 @@ export default function AudienceSession() {
   }
 
   return (
-    <div className="min-h-[100dvh] px-2 py-3 sm:p-4 max-w-4xl mx-auto">
+    <div className="min-h-[100dvh] px-4 pt-16 pb-4 sm:px-5 sm:pt-16 sm:pb-5 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

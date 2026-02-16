@@ -274,8 +274,8 @@ export default function HostCreate() {
   const generationActive = aiGenerating || themeGenerating
 
   return (
-    <div className="min-h-[100dvh] px-3 py-4 sm:p-6 max-w-lg mx-auto">
-      <h1 className="text-3xl font-bold mb-8 text-center">Start a Game</h1>
+    <div className="min-h-[100dvh] px-4 pt-16 pb-6 sm:px-6 sm:pt-16 sm:pb-6 max-w-lg mx-auto">
+      <h1 className="text-3xl sm:text-4xl font-bold mb-6 sm:mb-8 text-center">Start a Game</h1>
 
       {!sessionCode ? (
         <div className="space-y-6 animate-slide-up">
@@ -592,8 +592,8 @@ export default function HostCreate() {
 
           {/* Session Code Display */}
           <div className="bg-white/10 rounded-2xl p-6 text-center">
-            <p className="text-white/60 mb-2">Session Code</p>
-            <p className="text-5xl font-mono font-bold tracking-wider text-secondary">
+            <p className="text-white/60 text-base mb-2">Session Code</p>
+            <p className="text-5xl sm:text-6xl font-mono font-bold tracking-wider text-secondary">
               {sessionCode}
             </p>
           </div>

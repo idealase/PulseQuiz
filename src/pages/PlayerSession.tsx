@@ -337,7 +337,7 @@ export default function PlayerSession() {
   ]
 
   return (
-    <div className="h-[100dvh] p-3 sm:p-4 max-w-lg mx-auto flex flex-col overflow-hidden">
+    <div className="h-[100dvh] p-4 sm:p-5 max-w-2xl mx-auto flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 sm:mb-4">
         <div>
@@ -416,8 +416,8 @@ export default function PlayerSession() {
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-2xl p-2 sm:p-3 mb-2 shrink-0">
-            <h2 className="text-sm sm:text-base md:text-xl font-bold text-center line-clamp-3">
+          <div className="bg-white/10 rounded-2xl p-3 sm:p-4 mb-2 shrink-0">
+            <h2 className="text-base sm:text-lg md:text-xl font-bold text-center line-clamp-3">
               {currentQuestion.question}
             </h2>
           </div>
@@ -478,7 +478,7 @@ export default function PlayerSession() {
           )}
 
           {/* Options */}
-          <div className="flex-1 grid grid-cols-2 sm:grid-cols-1 gap-2 min-h-0 auto-rows-fr">
+          <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 min-h-0 auto-rows-fr">
             {currentQuestion.options.map((opt, i) => {
               const timerExpired = session.settings?.timerMode && timerRemaining === 0
               const isDisabled = answerLocked || timerExpired
@@ -488,7 +488,7 @@ export default function PlayerSession() {
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`px-3 py-2 rounded-xl text-left text-sm font-medium leading-tight transition-all active:scale-98 flex items-center ${
+                  className={`px-4 py-3 rounded-xl text-left text-base font-medium leading-snug transition-all active:scale-98 flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
                         ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
@@ -498,7 +498,7 @@ export default function PlayerSession() {
                         : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
                   }`}
                 >
-                  <span className="font-bold mr-2 shrink-0">{String.fromCharCode(65 + i)}.</span>
+                  <span className="font-bold mr-2 shrink-0 text-lg">{String.fromCharCode(65 + i)}.</span>
                   <span className="line-clamp-2 md:line-clamp-3">{opt}</span>
                 </button>
               )
@@ -510,16 +510,16 @@ export default function PlayerSession() {
             <button
               onClick={handleConfirmAnswer}
               disabled={selectedAnswer === null}
-              className="mt-2 py-2.5 sm:py-3 text-base sm:text-lg font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
+              className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
             >
               Lock In Answer
             </button>
           ) : answerLocked ? (
-            <div className="mt-2 py-2.5 sm:py-3 text-base sm:text-lg font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500 shrink-0">
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500 shrink-0">
               ✓ Answer Locked
             </div>
           ) : (
-            <div className="mt-2 py-2.5 sm:py-3 text-base sm:text-lg font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300 shrink-0">
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300 shrink-0">
               ⏰ Time Expired
             </div>
           )}

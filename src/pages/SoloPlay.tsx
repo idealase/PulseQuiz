@@ -406,16 +406,16 @@ export default function SoloPlay() {
   if (phase === 'setup') {
     return (
       <>
-        <div className="min-h-[100dvh] px-3 py-4 sm:p-6">
+        <div className="min-h-[100dvh] px-4 pt-16 pb-6 sm:px-6 sm:pt-16 sm:pb-6">
         <div className="max-w-2xl mx-auto">
           <Link to="/" className="text-white/60 hover:text-white mb-6 inline-block">
             ← Back
           </Link>
 
-          <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
             🎯 Solo Mode
           </h1>
-          <p className="text-white/60 mb-8">Practice on your own - no pressure!</p>
+          <p className="text-white/60 text-base mb-8">Practice on your own - no pressure!</p>
 
           {error && (
             <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300">
@@ -653,7 +653,7 @@ export default function SoloPlay() {
     const needsMoreQuestions = dynamicConfig ? questions.length < dynamicConfig.targetCount : false
     const shouldBlockForBatch = generatingBatch && isAtLastLoadedQuestion && needsMoreQuestions
     return (
-      <div className="h-[100dvh] p-4 flex flex-col overflow-hidden">
+      <div className="h-[100dvh] p-4 sm:p-5 flex flex-col overflow-hidden">
         {/* Header */}
         <div className="flex justify-between items-center mb-2 shrink-0">
           <div className="text-white/60">
@@ -696,14 +696,14 @@ export default function SoloPlay() {
 
         {/* Question */}
         <div className="flex-1 flex flex-col min-h-0 max-w-2xl mx-auto w-full">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 md:p-8 mb-3 shrink-0">
-            <h2 className="text-lg md:text-3xl font-bold text-center">
+          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 md:p-6 mb-3 shrink-0">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-center">
               {currentQuestion.question}
             </h2>
           </div>
 
           {/* Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 flex-1 min-h-0 auto-rows-fr">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 flex-1 min-h-0 auto-rows-fr">
             {currentQuestion.options.map((option, index) => {
               let bgClass = 'bg-white/10 hover:bg-white/20 border-white/20 hover:border-white/40'
               
@@ -722,11 +722,11 @@ export default function SoloPlay() {
                   key={index}
                   onClick={() => !showResult && handleAnswer(index)}
                   disabled={showResult}
-                  className={`px-4 py-3 md:p-6 rounded-2xl border-2 text-left transition-all flex items-center ${bgClass} ${
+                  className={`px-4 py-3 md:py-4 rounded-2xl border-2 text-left transition-all flex items-center ${bgClass} ${
                     !showResult ? 'hover:scale-102 active:scale-98' : ''
                   }`}
                 >
-                  <span className="text-sm md:text-lg line-clamp-2">{option}</span>
+                  <span className="text-base sm:text-lg line-clamp-2">{option}</span>
                 </button>
               )
             })}
@@ -785,7 +785,7 @@ export default function SoloPlay() {
     else { grade = '🏆'; message = 'Outstanding!' }
 
     return (
-      <div className="h-[100dvh] px-4 py-3 sm:p-6 flex items-center justify-center overflow-y-auto">
+      <div className="h-[100dvh] px-5 py-3 sm:p-6 flex items-center justify-center overflow-y-auto">
         <div className="max-w-md w-full text-center">
           <div className="text-8xl mb-4">{grade}</div>
           <h1 className="text-4xl font-bold mb-2">{message}</h1>

@@ -650,7 +650,7 @@ export default function HostSession() {
   const hostDisplayName = hostPlayerName || 'Host'
 
   return (
-    <div className={`min-h-[100dvh] px-2 py-3 sm:p-4 mx-auto ${presentationMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
+    <div className={`min-h-[100dvh] px-4 pt-16 pb-4 sm:px-5 sm:pt-16 sm:pb-5 mx-auto ${presentationMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

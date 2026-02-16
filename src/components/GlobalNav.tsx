@@ -7,27 +7,27 @@ export default function GlobalNav() {
 
   return (
     <>
-      <div className="fixed top-4 left-4 z-50">
+      <div className="fixed top-3 left-3 sm:top-4 sm:left-4 z-50">
         <Link
           to="/"
           aria-label="Home menu"
-          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-semibold shadow-lg transition-all ${
+          className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-semibold shadow-lg transition-all ${
             isHome
               ? 'bg-white/15 border-white/20 text-white/80'
               : 'bg-white/10 border-white/30 text-white/90 hover:bg-white/20'
           }`}
         >
-          <span className="text-lg">🏠</span>
-          <span>Menu</span>
+          <span className="text-base sm:text-lg">🏠</span>
+          <span className="hidden sm:inline">Menu</span>
         </Link>
       </div>
 
-      <div className="fixed top-4 right-4 z-50">
+      <div className="fixed top-3 right-3 sm:top-4 sm:right-4 z-50">
         <Link
           to="/settings"
           state={{ from: location.pathname }}
           aria-label="Settings"
-          className={`inline-flex items-center justify-center w-10 h-10 rounded-full border shadow-lg transition-all ${
+          className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-lg transition-all ${
             isSettings
               ? 'bg-white/20 border-white/30 text-white'
               : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20 hover:text-white'

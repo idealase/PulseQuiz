@@ -46,7 +46,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-[100dvh] px-3 py-4 sm:p-6 max-w-lg mx-auto">
+    <div className="min-h-[100dvh] px-4 pt-16 pb-6 sm:px-6 sm:pt-16 sm:pb-6 max-w-lg mx-auto">
       <div className="mb-8">
         <button
           onClick={handleBack}
@@ -58,8 +58,8 @@ export default function Settings() {
           <span className="text-sm font-medium">Back</span>
         </button>
         <div className="text-center">
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-white/60 mt-2">Customize your experience</p>
+          <h1 className="text-3xl sm:text-4xl font-bold">Settings</h1>
+          <p className="text-white/60 text-base mt-2">Customize your experience</p>
         </div>
       </div>
 
