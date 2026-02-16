@@ -1,10 +1,18 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
+import { useTheme } from '../context/ThemeContext'
 import { getResumeInfo } from '../utils/sessionResume'
 
 export default function Landing() {
   const config = useConfig()
+  const { resetToDefault } = useTheme()
   const resumeInfo = getResumeInfo()
+
+  // Reset theme to default when returning to the landing page
+  useEffect(() => {
+    resetToDefault()
+  }, [resetToDefault])
   const resumeLabel = resumeInfo
     ? `${resumeInfo.role === 'host' ? 'Resume Host' : resumeInfo.role === 'player' ? 'Resume Play' : 'Resume Watch'} (${resumeInfo.code})`
     : null

@@ -297,6 +297,11 @@ Rules:
 - No raw CSS.
 - Only use hex colors and whitelisted token values.
 - Omit fields in deltas when no change is needed.
+- CRITICAL: Use DARK backgrounds and surfaces. Background luminance must be below 0.2 (dark colors like #0a1628, #1a1025, #120c1b). NEVER use light or pastel backgrounds.
+- Text must be light/bright on the dark background (high contrast, ratio >= 4.5).
+- Accent colors must be vivid and clearly visible against the dark background (contrast ratio >= 3.0).
+- Surface color must be slightly lighter than background but still dark.
+- Avoid light-on-light or washed-out color combinations.
 """
 
 THEME_REPAIR_PROMPT = """You are a UI theme fixer. Return ONLY JSON for a full ThemeSpec.
@@ -314,6 +319,10 @@ Schema:
 Rules:
 - No raw CSS.
 - Only use hex colors and whitelisted token values.
+- CRITICAL: Background and surface MUST be dark colors (luminance below 0.2). Never use light, pastel, or washed-out backgrounds.
+- Text must be light/bright with contrast ratio >= 4.5 against both background and surface.
+- Accent colors must be vivid and visible against the dark background (contrast ratio >= 3.0).
+- Surface should be slightly lighter than background but still clearly dark.
 """
 
 

@@ -41,6 +41,7 @@ const ThemeContext = createContext<{
   intensity: ThemeIntensity
   experimentalTheme: boolean
   applyTheme: (theme: ThemeSpec, persist?: boolean) => void
+  resetToDefault: () => void
   setLockTheme: (value: boolean) => void
   setIntensity: (value: ThemeIntensity) => void
   setExperimentalTheme: (value: boolean) => void
@@ -140,6 +141,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const resetToDefault = useCallback(() => {
+    setTheme(DEFAULT_THEME)
+    localStorage.removeItem(STORAGE_THEME)
+  }, [])
+
   const setLockTheme = useCallback((value: boolean) => {
     setLockThemeState(value)
     localStorage.setItem(STORAGE_LOCK, String(value))
@@ -162,6 +168,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       intensity,
       experimentalTheme,
       applyTheme,
+      resetToDefault,
       setLockTheme,
       setIntensity,
       setExperimentalTheme
@@ -172,6 +179,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       intensity,
       experimentalTheme,
       applyTheme,
+      resetToDefault,
       setLockTheme,
       setIntensity,
       setExperimentalTheme

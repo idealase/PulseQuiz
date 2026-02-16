@@ -416,6 +416,32 @@ def validate_theme_spec(theme: ThemeSpec) -> List[str]:
     except Exception:
         issues.append("contrast check failed")
 
+    # Ensure background and surface are dark (low luminance)
+    try:
+        bg_lum = _luminance(_hex_to_rgb(theme.palette.background))
+        if bg_lum > 0.2:
+            issues.append(
+                f"background is too light (luminance {bg_lum:.2f}); "
+                "use a dark color with luminance below 0.2"
+            )
+        surface_lum = _luminance(_hex_to_rgb(theme.palette.surface))
+        if surface_lum > 0.25:
+            issues.append(
+                f"surface is too light (luminance {surface_lum:.2f}); "
+                "use a dark color with luminance below 0.25"
+            )
+    except Exception:
+        issues.append("background/surface luminance check failed")
+
+    # Ensure accent colors are visible against the background
+    try:
+        if contrast_ratio(theme.palette.accent, theme.palette.background) < 3.0:
+            issues.append("accent color has poor contrast on background (need >= 3.0)")
+        if contrast_ratio(theme.palette.accent2, theme.palette.background) < 3.0:
+            issues.append("accent2 color has poor contrast on background (need >= 3.0)")
+    except Exception:
+        issues.append("accent contrast check failed")
+
     return issues
 
 
