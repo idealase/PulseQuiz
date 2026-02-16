@@ -504,11 +504,13 @@ export default function PlayerSession() {
             <h3 className="font-bold">Your Answers</h3>
             {myResults?.map((q, i) => (
               <div key={i} className={`rounded-xl p-4 ${
-                q.answeredCorrectly ? 'bg-green-500/20' : 'bg-red-500/20'
+                q.yourAnswer != null
+                  ? (q.answeredCorrectly ? 'bg-green-500/20' : 'bg-red-500/20')
+                  : 'bg-white/5 border border-white/10'
               }`}>
                 <p className="text-sm text-white/80 mb-1">Q{i + 1}. {q.question}</p>
                 <div className="flex items-center gap-2 text-sm">
-                  {q.yourAnswer !== undefined ? (
+                  {q.yourAnswer != null ? (
                     <>
                       <span className={q.answeredCorrectly ? 'text-green-400' : 'text-red-400'}>
                         Your answer: {String.fromCharCode(65 + q.yourAnswer)}
@@ -520,7 +522,7 @@ export default function PlayerSession() {
                       )}
                     </>
                   ) : (
-                    <span className="text-white/50">Not answered</span>
+                    <span className="text-white/50">Not answered • Correct: {String.fromCharCode(65 + q.correct)}</span>
                   )}
                 </div>
                 <div className="mt-2 space-y-1 text-sm text-white/70">
