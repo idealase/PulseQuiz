@@ -20,7 +20,8 @@ import shutil
 from models import (
     Session, Question, Player, GameSettings,
     LiveLeaderboardEntry, QuestionStats, AnswerStatus,
-    ChallengeSubmission, ChallengeResolution, AIVerification, ReconciliationPolicy, ScoreAuditEntry,
+    ChallengeSubmission, ChallengeResolution, ChallengeReply, ChallengeVote,
+    AIVerification, ReconciliationPolicy, ScoreAuditEntry,
     generate_session_code, generate_token, generate_player_id
 )
 from theme_spec import (
@@ -157,6 +158,19 @@ class ChallengeAIVerifyRequest(BaseModel):
 
 class ChallengePublishRequest(BaseModel):
     publish: bool = True
+
+
+class ChallengeReplyRequest(BaseModel):
+    playerId: str
+    questionIndex: int
+    text: str
+
+
+class ChallengeVoteRequest(BaseModel):
+    playerId: str
+    questionIndex: int
+    challengePlayerId: str  # The submitter whose challenge is being voted on
+    vote: int  # +1 or -1
 
 
 class ReconcileRequest(BaseModel):
@@ -1458,13 +1472,20 @@ async def submit_challenge(code: str, request: ChallengeRequest):
     session.challenges[request.questionIndex][request.playerId] = submission
 
     summary = build_challenge_summary(session, request.questionIndex)
+    # Broadcast to ALL players so everyone sees the challenge badge
     await broadcast_to_session(code, {
         "type": "challenge_updated",
         "questionIndex": summary["questionIndex"],
         "count": summary["count"],
         "status": summary["status"],
         "categories": summary["categories"],
-    }, host_only=True)
+        "latestSubmission": {
+            "nickname": player.nickname,
+            "category": submission.category,
+            "note": submission.note,
+            "createdAt": submission.createdAt,
+        },
+    })
 
     log_game_event("challenge_submitted", session_code=code, player_id=request.playerId, data={
         "question_index": request.questionIndex,
@@ -1490,6 +1511,132 @@ async def get_my_challenges(code: str, player_id: str):
         if player_id in submissions
     ]
     return {"questionIndexes": sorted(question_indexes)}
+
+
+@app.get("/api/session/{code}/challenges/thread/{question_index}")
+async def get_challenge_thread(code: str, question_index: int, player_id: str = ""):
+    """Get the challenge thread for a question (accessible by all players)."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if question_index < 0 or question_index >= len(session.questions):
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    submissions = session.challenges.get(question_index, {})
+    resolution = session.challenge_resolutions.get(question_index)
+
+    thread_entries = []
+    for sub in submissions.values():
+        thread_entries.append({
+            "type": "challenge",
+            "playerId": sub.playerId,
+            "nickname": sub.nickname,
+            "category": sub.category,
+            "note": sub.note,
+            "createdAt": sub.createdAt,
+            "voteScore": sub.voteScore,
+            "myVote": sub.votes.get(player_id, 0) if player_id else 0,
+            "replies": [r.model_dump() for r in sub.replies],
+        })
+
+    # Sort by createdAt
+    thread_entries.sort(key=lambda e: e["createdAt"])
+
+    return {
+        "questionIndex": question_index,
+        "question": session.questions[question_index].question,
+        "challengeCount": len(submissions),
+        "status": resolution.status if resolution else "open",
+        "resolution": resolution.model_dump() if resolution and resolution.published else None,
+        "thread": thread_entries,
+    }
+
+
+@app.post("/api/session/{code}/challenges/vote")
+async def vote_on_challenge(code: str, request: ChallengeVoteRequest):
+    """Upvote or downvote a challenge submission."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if request.playerId not in session.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if request.vote not in (1, -1, 0):
+        raise HTTPException(status_code=400, detail="Vote must be 1, -1, or 0")
+
+    submissions = session.challenges.get(request.questionIndex, {})
+    submission = submissions.get(request.challengePlayerId)
+    if not submission:
+        raise HTTPException(status_code=404, detail="Challenge submission not found")
+
+    if request.vote == 0:
+        submission.votes.pop(request.playerId, None)
+    else:
+        submission.votes[request.playerId] = request.vote
+    submission.voteScore = sum(submission.votes.values())
+
+    summary = build_challenge_summary(session, request.questionIndex)
+    await broadcast_to_session(code, {
+        "type": "challenge_updated",
+        "questionIndex": summary["questionIndex"],
+        "count": summary["count"],
+        "status": summary["status"],
+        "categories": summary["categories"],
+    })
+
+    return {"ok": True, "voteScore": submission.voteScore}
+
+
+@app.post("/api/session/{code}/challenges/reply")
+async def reply_to_challenge(code: str, request: ChallengeReplyRequest):
+    """Add a reply/comment to an existing challenge thread for a question."""
+    if code not in sessions:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    session = sessions[code]
+    if request.playerId not in session.players:
+        raise HTTPException(status_code=404, detail="Player not found")
+
+    if request.questionIndex < 0 or request.questionIndex >= len(session.questions):
+        raise HTTPException(status_code=400, detail="Invalid question index")
+
+    if not request.text.strip():
+        raise HTTPException(status_code=400, detail="Reply text cannot be empty")
+
+    # Find the challenge thread for this question — attach reply to first submission
+    # or create a general thread entry
+    submissions = session.challenges.get(request.questionIndex, {})
+    if not submissions:
+        raise HTTPException(status_code=404, detail="No challenges exist for this question")
+
+    player = session.players[request.playerId]
+    reply = ChallengeReply(
+        replyId=generate_player_id(),
+        playerId=request.playerId,
+        nickname=player.nickname,
+        text=request.text.strip(),
+        createdAt=time.time(),
+    )
+
+    # Add reply to the first submission (thread is per-question, replies go on the earliest challenge)
+    first_submission = min(submissions.values(), key=lambda s: s.createdAt)
+    first_submission.replies.append(reply)
+
+    # Broadcast update to all players
+    await broadcast_to_session(code, {
+        "type": "challenge_reply",
+        "questionIndex": request.questionIndex,
+        "reply": reply.model_dump(),
+        "totalReplies": sum(len(s.replies) for s in submissions.values()),
+    })
+
+    log_game_event("challenge_reply", session_code=code, player_id=request.playerId, data={
+        "question_index": request.questionIndex,
+    })
+
+    return {"ok": True, "reply": reply.model_dump()}
 
 
 @app.get("/api/session/{code}/challenges")
@@ -1572,13 +1719,14 @@ async def resolve_challenge(
     session.challenge_resolutions[question_index] = resolution
 
     summary = build_challenge_summary(session, question_index)
+    # Broadcast challenge status update to ALL players
     await broadcast_to_session(code, {
         "type": "challenge_updated",
         "questionIndex": summary["questionIndex"],
         "count": summary["count"],
         "status": summary["status"],
         "categories": summary["categories"],
-    }, host_only=True)
+    })
 
     await broadcast_to_session(code, {
         "type": "challenge_resolution",
@@ -1612,6 +1760,14 @@ async def ai_verify_challenge(
         raise HTTPException(status_code=404, detail="Question not found")
 
     question = session.questions[question_index]
+
+    # Include player challenge reasons for context
+    challenge_submissions = session.challenges.get(question_index, {})
+    challenge_reasons = []
+    for sub in challenge_submissions.values():
+        if sub.reason:
+            challenge_reasons.append(sub.reason)
+
     prompt = (
         "Review this trivia question and decide if the provided correct answer is valid. "
         "Return JSON only with verdict (valid|invalid|ambiguous), confidence (0-1), rationale, "
@@ -1621,14 +1777,25 @@ async def ai_verify_challenge(
         f"Correct index: {question.correct}\n"
         f"Correct text: {question.options[question.correct]}\n"
     )
+    if challenge_reasons:
+        prompt += f"\nPlayer challenge reasons:\n" + "\n".join(f"- {r}" for r in challenge_reasons) + "\n"
 
-    content = await generate_with_copilot(
-        prompt,
-        system_message="You are a fact-checker. Output ONLY valid JSON.",
-        caller="challenge_ai_verify",
-    )
+    try:
+        content, ai_meta = await generate_with_copilot(
+            prompt,
+            system_message="You are a fact-checker. Output ONLY valid JSON.",
+            caller="challenge_ai_verify",
+        )
+    except Exception as e:
+        logger.error(f"AI verification generation failed: {e}")
+        raise HTTPException(status_code=502, detail=f"AI verification failed: {e}")
 
-    data = extract_json_payload(content)
+    try:
+        data = extract_json_payload(content)
+    except (ValueError, json.JSONDecodeError) as e:
+        logger.error(f"AI verification JSON parse failed: {e}\nContent: {content[:500]}")
+        raise HTTPException(status_code=502, detail=f"AI returned invalid response: {e}")
+
     verdict = str(data.get("verdict", "ambiguous")).strip().lower()
     confidence = float(data.get("confidence", 0.5))
     confidence = max(0.0, min(1.0, confidence))
