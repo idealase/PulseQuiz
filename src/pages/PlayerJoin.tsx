@@ -42,7 +42,7 @@ export default function PlayerJoin() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
+    <div className="h-[100dvh] flex flex-col items-center justify-center px-4 py-3 sm:p-6">
       <div className="w-full max-w-sm animate-slide-up">
         <h1 className="text-3xl font-bold text-center mb-8">Join Game</h1>
 

@@ -406,7 +406,7 @@ export default function SoloPlay() {
   if (phase === 'setup') {
     return (
       <>
-        <div className="min-h-screen p-6">
+        <div className="min-h-[100dvh] px-3 py-4 sm:p-6">
         <div className="max-w-2xl mx-auto">
           <Link to="/" className="text-white/60 hover:text-white mb-6 inline-block">
             ← Back
@@ -785,7 +785,7 @@ export default function SoloPlay() {
     else { grade = '🏆'; message = 'Outstanding!' }
 
     return (
-      <div className="min-h-screen p-6 flex items-center justify-center">
+      <div className="h-[100dvh] px-4 py-3 sm:p-6 flex items-center justify-center overflow-y-auto">
         <div className="max-w-md w-full text-center">
           <div className="text-8xl mb-4">{grade}</div>
           <h1 className="text-4xl font-bold mb-2">{message}</h1>

@@ -274,7 +274,7 @@ export default function HostCreate() {
   const generationActive = aiGenerating || themeGenerating
 
   return (
-    <div className="min-h-screen p-6 max-w-lg mx-auto">
+    <div className="min-h-[100dvh] px-3 py-4 sm:p-6 max-w-lg mx-auto">
       <h1 className="text-3xl font-bold mb-8 text-center">Start a Game</h1>
 
       {!sessionCode ? (

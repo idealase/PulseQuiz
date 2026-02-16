@@ -34,7 +34,7 @@ export default function Settings() {
   }, [showHints])
 
   return (
-    <div className="min-h-screen p-6 max-w-lg mx-auto">
+    <div className="min-h-[100dvh] px-3 py-4 sm:p-6 max-w-lg mx-auto">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-white/60 mt-2">Customize your experience</p>

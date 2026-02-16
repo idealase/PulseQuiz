@@ -19,34 +19,34 @@ export default function Landing() {
     : null
   
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6">
-      <div className="text-center mb-12 animate-slide-up">
-        <h1 className="text-5xl md:text-7xl font-black mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+    <div className="h-[100dvh] flex flex-col items-center justify-center px-4 py-3 sm:p-6 overflow-hidden">
+      <div className="text-center mb-4 sm:mb-8 animate-slide-up">
+        <h1 className="text-4xl sm:text-5xl md:text-7xl font-black mb-1 sm:mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
           PulseQuiz
         </h1>
-        <p className="text-white/60 text-lg md:text-xl">
+        <p className="text-white/60 text-sm sm:text-lg md:text-xl">
           Real-time team quiz battles{config.customMessage && ` — ${config.customMessage}`}
         </p>
       </div>
 
-      <div className="flex flex-col gap-4 w-full max-w-xs animate-slide-up" style={{ animationDelay: '0.1s' }}>
+      <div className="flex flex-col gap-2.5 sm:gap-4 w-full max-w-sm animate-slide-up" style={{ animationDelay: '0.1s' }}>
         <Link
           to="/solo"
-          className="block w-full py-4 px-8 text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all duration-300 shadow-lg hover:shadow-orange-500/40 hover:scale-105 active:scale-95"
+          className="block w-full py-3 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all duration-300 shadow-lg hover:shadow-orange-500/40 hover:scale-105 active:scale-95"
         >
           🎯 Solo Mode
         </Link>
 
         <Link
           to="/host"
-          className="block w-full py-4 px-8 text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all duration-300 shadow-lg hover:shadow-primary/50 hover:scale-105 active:scale-95"
+          className="block w-full py-3 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all duration-300 shadow-lg hover:shadow-primary/50 hover:scale-105 active:scale-95"
         >
           Start Game
         </Link>
 
         <Link
           to="/join"
-          className="block w-full py-4 px-8 text-xl font-bold text-center rounded-2xl bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
+          className="block w-full py-3 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-bold text-center rounded-2xl bg-white/10 border-2 border-white/30 hover:bg-white/20 hover:border-white/50 transition-all duration-300 hover:scale-105 active:scale-95"
         >
           Join Game
         </Link>
@@ -54,7 +54,7 @@ export default function Landing() {
         {resumeInfo && resumeLabel && (
           <Link
             to={resumeInfo.path}
-            className="block w-full py-3 px-8 text-lg font-semibold text-center rounded-2xl bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/30 hover:border-emerald-400 text-emerald-200 transition-all duration-300 hover:scale-105 active:scale-95"
+            className="block w-full py-2.5 sm:py-3 px-6 sm:px-8 text-base sm:text-lg font-semibold text-center rounded-2xl bg-emerald-500/20 border border-emerald-500/50 hover:bg-emerald-500/30 hover:border-emerald-400 text-emerald-200 transition-all duration-300 hover:scale-105 active:scale-95"
           >
             {resumeLabel}
           </Link>
@@ -62,7 +62,7 @@ export default function Landing() {
 
         <Link
           to="/watch"
-          className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30 hover:border-purple-500 text-purple-300 transition-all duration-300 hover:scale-105 active:scale-95"
+          className="block w-full py-2.5 sm:py-3 px-6 sm:px-8 text-base sm:text-lg font-medium text-center rounded-2xl bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30 hover:border-purple-500 text-purple-300 transition-all duration-300 hover:scale-105 active:scale-95"
         >
           👀 Watch Game
         </Link>
@@ -72,14 +72,14 @@ export default function Landing() {
       {/* Help Guide Toggle */}
       <button
         onClick={() => setShowHelp(!showHelp)}
-        className="mt-8 text-white/50 hover:text-white/80 text-sm font-medium transition-colors duration-200 flex items-center gap-1.5"
+        className="mt-3 sm:mt-6 text-white/50 hover:text-white/80 text-sm font-medium transition-colors duration-200 flex items-center gap-1.5"
       >
         <span>{showHelp ? '▾' : '▸'}</span> How does PulseQuiz work?
       </button>
 
       {/* Help Guide */}
       {showHelp && (
-        <div className="mt-4 w-full max-w-lg animate-slide-up text-left space-y-5 bg-white/5 border border-white/10 rounded-2xl p-6">
+        <div className="mt-3 w-full max-w-lg animate-slide-up text-left space-y-4 bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-6 max-h-[40vh] overflow-y-auto">
           <div>
             <h3 className="text-white font-bold text-base mb-1.5">🎯 Solo Mode</h3>
             <p className="text-white/60 text-sm leading-relaxed">
@@ -122,7 +122,7 @@ export default function Landing() {
         </div>
       )}
 
-      <div className="mt-12 text-white/40 text-sm text-center">
+      <div className="mt-3 sm:mt-8 text-white/40 text-xs sm:text-sm text-center">
         <p>Made for quiz night fun 🎉</p>
       </div>
     </div>

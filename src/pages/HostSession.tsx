@@ -612,7 +612,7 @@ export default function HostSession() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[100dvh] flex items-center justify-center">
         <div className="animate-pulse text-xl">Connecting...</div>
       </div>
     )
@@ -628,7 +628,7 @@ export default function HostSession() {
   const hostDisplayName = hostPlayerName || 'Host'
 
   return (
-    <div className={`min-h-screen p-4 mx-auto ${presentationMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
+    <div className={`min-h-[100dvh] px-2 py-3 sm:p-4 mx-auto ${presentationMode ? 'max-w-4xl' : 'max-w-2xl'}`}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>

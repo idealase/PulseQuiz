@@ -118,7 +118,7 @@ export default function AudienceSession() {
 
   if (!session) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center">
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center">
         <div className="animate-pulse text-xl mb-4">Connecting...</div>
         <p className="text-white/60">Observer mode</p>
       </div>
@@ -142,7 +142,7 @@ export default function AudienceSession() {
   }
 
   return (
-    <div className="min-h-screen p-4 max-w-4xl mx-auto">
+    <div className="min-h-[100dvh] px-2 py-3 sm:p-4 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
