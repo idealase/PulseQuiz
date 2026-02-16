@@ -101,6 +101,7 @@ export default function HostSession() {
   const isHostPlayer = Boolean(hostPlayerId && hostRole !== 'host_only')
   const [authToken, setAuthToken] = useState(localStorage.getItem('quiz_auth_token') || '')
   const [showAuthTokenInput, setShowAuthTokenInput] = useState(false)
+  const [authTokenDraft, setAuthTokenDraft] = useState('')
   const api = new ApiClient(config.apiBaseUrl)
 
   const shouldGuard = Boolean(session && code && hostToken)
@@ -557,8 +558,8 @@ export default function HostSession() {
     setChallengeLoading(false)
   }
 
-  const handleSaveAuthToken = (token: string) => {
-    const trimmed = token.trim()
+  const handleSaveAuthToken = () => {
+    const trimmed = authTokenDraft.trim()
     if (trimmed) {
       setAuthToken(trimmed)
       localStorage.setItem('quiz_auth_token', trimmed)
@@ -571,6 +572,7 @@ export default function HostSession() {
     if (!code || !hostToken || selectedChallengeIndex === null) return
     if (!authToken) {
       setShowAuthTokenInput(true)
+      setAuthTokenDraft('')
       setChallengeError('An auth token is required for AI features. Enter it below.')
       return
     }
@@ -580,7 +582,15 @@ export default function HostSession() {
       const response = await api.requestChallengeAIVerification(code, hostToken, authToken, selectedChallengeIndex)
       setChallengeDetail(prev => prev ? { ...prev, aiVerification: response.aiVerification } : prev)
     } catch (e) {
-      setChallengeError(e instanceof Error ? e.message : 'AI verification failed')
+      const message = e instanceof Error ? e.message : 'AI verification failed'
+      setChallengeError(message)
+      // If auth rejected, clear stale token and prompt for a new one
+      if (message.includes('401') || message.toLowerCase().includes('unauthorized') || message.toLowerCase().includes('auth')) {
+        setAuthToken('')
+        localStorage.removeItem('quiz_auth_token')
+        setShowAuthTokenInput(true)
+        setAuthTokenDraft('')
+      }
     }
     setAiVerificationLoading(false)
   }
@@ -1436,20 +1446,19 @@ export default function HostSession() {
                           <div className="flex gap-2">
                             <input
                               type="password"
+                              value={authTokenDraft}
+                              onChange={(e) => setAuthTokenDraft(e.target.value)}
                               placeholder="Auth token / access code"
                               className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary/50"
                               onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleSaveAuthToken((e.target as HTMLInputElement).value)
-                                }
+                                if (e.key === 'Enter') handleSaveAuthToken()
                               }}
+                              autoFocus
                             />
                             <button
-                              onClick={(e) => {
-                                const input = (e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement)
-                                if (input) handleSaveAuthToken(input.value)
-                              }}
-                              className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
+                              onClick={handleSaveAuthToken}
+                              disabled={!authTokenDraft.trim()}
+                              className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30 disabled:opacity-50"
                             >
                               Save
                             </button>
@@ -1478,6 +1487,15 @@ export default function HostSession() {
                         >
                           {publishAiLoading ? 'Publishing...' : 'Publish AI Result'}
                         </button>
+                        {!showAuthTokenInput && (
+                          <button
+                            onClick={() => { setShowAuthTokenInput(true); setAuthTokenDraft(authToken) }}
+                            className="px-3 py-2 rounded-lg text-xs text-white/40 hover:text-white/70 transition-colors"
+                            title={authToken ? 'Update auth token' : 'Set auth token'}
+                          >
+                            {authToken ? '🔑 Update Token' : '🔑 Set Token'}
+                          </button>
+                        )}
                       </div>
                     </div>
 
