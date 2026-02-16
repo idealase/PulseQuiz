@@ -19,24 +19,20 @@ fi
 CHAT_DIR="${CWD:-.}/.chat"
 mkdir -p "$CHAT_DIR"
 
-# Derive a slug from the first user message in the transcript
+# Derive a slug from the first user message in the transcript.
+# The transcript is NDJSON (one JSON object per line).
+# User messages have: {"type":"user.message","data":{"content":"..."}}
 SLUG="session"
+STOP_WORDS="a|an|the|is|it|in|on|at|to|for|of|and|or|but|with|that|this|was|are|be|has|have|had|do|does|did|will|would|could|should|can|may|might|i|you|we|they|he|she|my|your|our|its|me|us|them|not|no|so|if|just|also|very|really|about|from|into|up|out|how|what|when|where|why|who|which|there|here|then|than|been|being|some|all|any|each|every|both|few|more|most|other|please|think|make|made|want|like|use|get|go|know|see|look|way|take|come|could|after|before|now|new|one|two|let|lets"
 if command -v jq &>/dev/null; then
-  # Try array-of-messages: first entry with role matching user/human
-  FIRST_MSG=$(jq -r '
-    (if type == "array" then . else (.messages // []) end)
-    | map(select(.role // .type | test("user|human"; "i")))
-    | first
-    | (.content // .text // .message // empty)
-  ' "$TRANSCRIPT_PATH" 2>/dev/null)
-  # Fall back to top-level .title
-  if [ -z "$FIRST_MSG" ]; then
-    FIRST_MSG=$(jq -r '.title // empty' "$TRANSCRIPT_PATH" 2>/dev/null)
-  fi
+  FIRST_MSG=$(jq -r 'select(.type == "user.message") | .data.content // empty' "$TRANSCRIPT_PATH" 2>/dev/null | head -n 1)
   if [ -n "$FIRST_MSG" ]; then
-    # Take first 50 chars, lowercase, replace non-alphanum with hyphens
-    SLUG=$(echo "$FIRST_MSG" | head -c 50 | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]\+/-/g; s/^-//; s/-$//')
-    [ -z "$SLUG" ] && SLUG="session"
+    # Extract keywords: lowercase, split to words, filter stop words, take first 5
+    KEYWORDS=$(echo "$FIRST_MSG" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/ /g' \
+      | tr ' ' '\n' | awk 'length >= 3' \
+      | grep -vwE "$STOP_WORDS" \
+      | awk '!seen[$0]++' | head -n 5 | paste -sd '-' -)
+    [ -n "$KEYWORDS" ] && SLUG="$KEYWORDS"
   fi
 fi
 
