@@ -636,7 +636,7 @@ export default function HostSession() {
             <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
             <button
               onClick={() => {
-                const link = `${window.location.origin}/join/${code}`
+                const link = `${window.location.origin}/#/join/${code}`
                 navigator.clipboard.writeText(link)
                 setCopiedLink('header')
                 setTimeout(() => setCopiedLink(null), 2000)
@@ -777,11 +777,11 @@ export default function HostSession() {
                 <label className="block text-white/50 text-xs mb-1">Player Join Link</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-black/30 rounded-lg text-sm text-white/80 truncate">
-                    {`${window.location.origin}/join/${code}`}
+                    {`${window.location.origin}/#/join/${code}`}
                   </code>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/join/${code}`)
+                      navigator.clipboard.writeText(`${window.location.origin}/#/join/${code}`)
                       setCopiedLink('player')
                       setTimeout(() => setCopiedLink(null), 2000)
                     }}
@@ -800,11 +800,11 @@ export default function HostSession() {
                 <label className="block text-white/50 text-xs mb-1">Audience Watch Link</label>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 px-3 py-2 bg-black/30 rounded-lg text-sm text-white/80 truncate">
-                    {`${window.location.origin}/watch/${code}`}
+                    {`${window.location.origin}/#/watch/${code}`}
                   </code>
                   <button
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/watch/${code}`)
+                      navigator.clipboard.writeText(`${window.location.origin}/#/watch/${code}`)
                       setCopiedLink('audience')
                       setTimeout(() => setCopiedLink(null), 2000)
                     }}
