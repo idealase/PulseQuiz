@@ -536,15 +536,69 @@ export default function PlayerSession() {
                   </p>
                 )}
 
-                {q.challengeStatus && (
-                  <div className="mt-2 text-xs text-white/70">
-                    Resolution: {q.challengeStatus}
-                    {q.resolutionVerdict && ` • ${q.resolutionVerdict}`}
-                    {q.resolutionNote && <span className="block text-white/60 mt-1">{q.resolutionNote}</span>}
-                  </div>
-                )}
+                {q.challengeStatus && (() => {
+                  const isValid = q.resolutionVerdict?.toLowerCase().includes('valid') && !q.resolutionVerdict?.toLowerCase().includes('invalid')
+                  const isInvalid = q.resolutionVerdict?.toLowerCase().includes('invalid')
+                  const verdictColor = isValid ? 'text-green-300' : isInvalid ? 'text-red-300' : 'text-yellow-300'
+                  const verdictBg = isValid ? 'bg-green-500/15 border-green-400/30' : isInvalid ? 'bg-red-500/15 border-red-400/30' : 'bg-yellow-500/15 border-yellow-400/30'
+                  const verdictIcon = isValid ? '✅' : isInvalid ? '❌' : '⚖️'
+                  const glowColor = isValid ? 'shadow-green-500/20' : isInvalid ? 'shadow-red-500/20' : 'shadow-yellow-500/20'
 
-                {q.scoringPolicy && (
+                  return (
+                    <div className={`mt-3 rounded-xl border p-4 ${verdictBg} ${glowColor} shadow-lg animate-[fadeIn_0.5s_ease-in-out]`}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xl">{verdictIcon}</span>
+                        <span className={`font-bold text-sm uppercase tracking-wide ${verdictColor}`}>
+                          Challenge {q.challengeStatus}
+                        </span>
+                        {q.resolutionVerdict && (
+                          <span className={`ml-auto text-xs font-semibold px-2.5 py-0.5 rounded-full ${
+                            isValid ? 'bg-green-500/25 text-green-200' : isInvalid ? 'bg-red-500/25 text-red-200' : 'bg-yellow-500/25 text-yellow-200'
+                          }`}>
+                            {q.resolutionVerdict}
+                          </span>
+                        )}
+                      </div>
+                      {q.resolutionNote && (
+                        <p className="text-sm text-white/80 mt-1 pl-7 italic">
+                          "{q.resolutionNote}"
+                        </p>
+                      )}
+
+                      {q.aiVerdict && (
+                        <div className="mt-3 pt-3 border-t border-white/10 pl-7">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-base">🤖</span>
+                            <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">AI Verification</span>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                              q.aiVerdict === 'valid' ? 'bg-green-500/25 text-green-200' : 'bg-red-500/25 text-red-200'
+                            }`}>
+                              {q.aiVerdict} &middot; {Math.round((q.aiConfidence ?? 0) * 100)}%
+                            </span>
+                          </div>
+                          {q.aiRationale && (
+                            <p className="text-xs text-white/60 mt-1 leading-relaxed">{q.aiRationale}</p>
+                          )}
+                        </div>
+                      )}
+
+                      {q.scoringPolicy && (
+                        <div className="mt-3 pt-3 border-t border-white/10 pl-7">
+                          <div className="flex items-center gap-2">
+                            <span className="text-base">📊</span>
+                            <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Scoring</span>
+                            <span className="text-xs text-white/70">{q.scoringPolicy}</span>
+                            {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
+                              <span className="text-xs text-white/50">(accepted: {q.acceptedAnswers.map(a => String.fromCharCode(65 + a)).join(', ')})</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                {!q.challengeStatus && q.scoringPolicy && (
                   <div className="mt-1 text-xs text-white/60">
                     Scoring policy: {q.scoringPolicy}
                     {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
@@ -553,7 +607,7 @@ export default function PlayerSession() {
                   </div>
                 )}
 
-                {q.aiVerdict && (
+                {!q.challengeStatus && q.aiVerdict && (
                   <div className="mt-2 text-xs text-white/60">
                     AI: {q.aiVerdict} ({Math.round((q.aiConfidence ?? 0) * 100)}%)
                     {q.aiRationale && <span className="block mt-1">{q.aiRationale}</span>}
