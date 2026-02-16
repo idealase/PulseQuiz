@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { useTheme } from '../context/ThemeContext'
+import { useAITelemetry } from '../context/AITelemetryContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
@@ -23,6 +24,7 @@ type DynamicConfig = {
 export default function SoloPlay() {
   const config = useConfig()
   const { applyTheme, lockTheme, intensity, experimentalTheme } = useTheme()
+  const { recordCall } = useAITelemetry()
   const api = new ApiClient(config.apiBaseUrl)
 
   // Setup phase state
@@ -171,6 +173,7 @@ export default function SoloPlay() {
         performance
       }, dynamicConfig.authToken)
 
+      if (result.ai_meta) recordCall('generate_dynamic_batch', result.ai_meta)
       if (result.questions.length > 0) {
         setQuestions(prev => [...prev, ...result.questions])
         setDynamicConfig(prev => prev ? {
@@ -215,6 +218,7 @@ export default function SoloPlay() {
         research_mode: aiResearchMode
       }, aiAuthToken)
 
+      if (result.ai_meta) recordCall('generate_questions', result.ai_meta)
       setQuestions(result.questions)
       setCsvErrors([])
       setGenerationTime(Date.now() - startTime)
@@ -226,6 +230,7 @@ export default function SoloPlay() {
             topic: aiTopics.trim(),
             intensity
           }, aiAuthToken)
+          if (themeResult.ai_meta) recordCall('generate_theme', themeResult.ai_meta)
           applyTheme(themeResult.theme)
         } catch (themeError) {
           console.warn('Theme generation failed', themeError)
@@ -287,6 +292,7 @@ export default function SoloPlay() {
         topic: aiTopics.trim(),
         intensity
       }, aiAuthToken)
+      if (themeResult.ai_meta) recordCall('generate_theme', themeResult.ai_meta)
       applyTheme(themeResult.theme)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Theme preview failed')

@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useConfig } from '../context/ConfigContext'
 import { useTheme } from '../context/ThemeContext'
+import { useAITelemetry } from '../context/AITelemetryContext'
 import { ApiClient } from '../api/client'
 import { parseCSV } from '../utils/csvParser'
 import { Question } from '../types'
@@ -13,6 +14,7 @@ export default function HostCreate() {
   const config = useConfig()
   const navigate = useNavigate()
   const { applyTheme, lockTheme, intensity, experimentalTheme } = useTheme()
+  const { recordCall } = useAITelemetry()
   
   const [sessionCode, setSessionCode] = useState<string | null>(null)
   const [hostToken, setHostToken] = useState<string | null>(null)
@@ -183,6 +185,7 @@ export default function HostCreate() {
         difficulty: 'mixed'
       }, aiAuthToken)
       
+      if (result.ai_meta) recordCall('generate_questions', result.ai_meta)
       setQuestions(result.questions)
       setGenerationTime(result.generation_time_ms)
 
@@ -193,6 +196,7 @@ export default function HostCreate() {
             topic: aiTopics,
             intensity
           }, aiAuthToken)
+          if (themeResult.ai_meta) recordCall('generate_theme', themeResult.ai_meta)
           applyTheme(themeResult.theme)
           // Propagate theme to session so players get it
           if (sessionCode && hostToken) {
@@ -251,6 +255,7 @@ export default function HostCreate() {
         topic: aiTopics,
         intensity
       }, aiAuthToken)
+      if (themeResult.ai_meta) recordCall('generate_theme', themeResult.ai_meta)
       applyTheme(themeResult.theme)
       // Propagate theme to session so players get it
       if (sessionCode && hostToken) {

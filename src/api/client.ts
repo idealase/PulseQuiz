@@ -44,6 +44,63 @@ interface PollEventsResponse {
   lastEventId: number
 }
 
+// --- AI Meta Types (Dev Mode telemetry) ---
+
+export interface AITokenUsage {
+  prompt_tokens?: number | null
+  completion_tokens?: number | null
+  total_tokens?: number | null
+  estimated?: boolean
+  ratelimit_remaining_tokens?: number | null
+  ratelimit_remaining_requests?: number | null
+}
+
+export interface AIMeta {
+  model?: string
+  endpoint?: string
+  prompt_chars?: number
+  response_chars?: number
+  elapsed_ms?: number
+  success?: boolean
+  error?: string | null
+  token_usage?: AITokenUsage
+  timestamp?: string
+  // Multi-call merged fields
+  calls?: AIMeta[]
+  total_calls?: number
+  total_elapsed_ms?: number
+  total_token_usage?: AITokenUsage
+}
+
+export interface DevInfo {
+  copilot_sdk_available: boolean
+  copilot_module_info: string
+  copilot_cli_path: string | null
+  active_model: string
+  valid_models: string[]
+  auth_configured: boolean
+  active_sessions: number
+  python_version: string
+  system_prompts: Record<string, string>
+}
+
+export interface TokenUsageSummary {
+  period_hours: number
+  total_calls: number
+  successful_calls: number
+  failed_calls: number
+  error_rate_pct: number
+  total_prompt_tokens: number
+  total_completion_tokens: number
+  total_tokens: number
+  total_elapsed_ms: number
+  avg_elapsed_ms: number
+  slowest_call: { endpoint: string; elapsed_ms: number; timestamp: string } | null
+  fastest_call: { endpoint: string; elapsed_ms: number; timestamp: string } | null
+  endpoint_breakdown: Record<string, number>
+  models_used: string[]
+}
+
 // --- AI Generation Types ---
 
 interface GenerateQuestionsRequest {
@@ -57,6 +114,7 @@ interface GenerateQuestionsResponse {
   questions: Question[]
   topics_clarified?: string
   generation_time_ms: number
+  ai_meta?: AIMeta | null
 }
 
 interface GenerateDynamicBatchRequest {
@@ -73,6 +131,7 @@ interface GenerateDynamicBatchResponse {
   suggested_difficulty: string
   difficulty_reason: string
   batch_number: number
+  ai_meta?: AIMeta | null
 }
 
 interface FactCheckRequest {
@@ -86,6 +145,7 @@ interface FactCheckResponse {
   confidence: number
   explanation: string
   source_hint?: string
+  ai_meta?: AIMeta | null
 }
 
 interface GenerateThemeRequest {
@@ -97,6 +157,7 @@ interface GenerateThemeResponse {
   theme: ThemeSpec
   fallback: boolean
   issues?: string[]
+  ai_meta?: AIMeta | null
 }
 
 export class ApiClient {
@@ -346,6 +407,16 @@ export class ApiClient {
       headers: { 'X-Auth-Token': authToken },
       body: JSON.stringify(request),
     })
+  }
+
+  // --- Dev Mode / Telemetry Methods ---
+
+  async getDevInfo(): Promise<DevInfo> {
+    return this.request('/api/dev/info')
+  }
+
+  async getTokenUsage(hours = 24): Promise<TokenUsageSummary> {
+    return this.request(`/api/token-usage?hours=${hours}`)
   }
 
   getWebSocketUrl(code: string): string {

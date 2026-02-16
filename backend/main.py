@@ -183,6 +183,7 @@ class GenerateQuestionsResponse(BaseModel):
     questions: List[Question]
     topics_clarified: Optional[str] = None
     generation_time_ms: int
+    ai_meta: Optional[dict] = None
 
 
 class PerformanceData(BaseModel):
@@ -206,6 +207,7 @@ class GenerateDynamicBatchResponse(BaseModel):
     suggested_difficulty: str
     difficulty_reason: str
     batch_number: int
+    ai_meta: Optional[dict] = None
 
 
 class FactCheckRequest(BaseModel):
@@ -219,6 +221,7 @@ class FactCheckResponse(BaseModel):
     confidence: float
     explanation: str
     source_hint: Optional[str] = None
+    ai_meta: Optional[dict] = None
 
 
 class GenerateThemeRequest(BaseModel):
@@ -230,6 +233,7 @@ class GenerateThemeResponse(BaseModel):
     theme: ThemeSpec
     fallback: bool = False
     issues: Optional[List[str]] = None
+    ai_meta: Optional[dict] = None
 
 
 # --- AI Generation Helper Functions ---
@@ -411,17 +415,21 @@ def parse_theme_spec_from_response(content: str) -> ThemeSpec:
     return ThemeSpec.model_validate(data)
 
 
-async def generate_theme_spec(topic: str, intensity: str) -> tuple[ThemeSpec, bool, list[str]]:
-    """Generate a ThemeSpec using Copilot with validation and repair."""
+async def generate_theme_spec(topic: str, intensity: str) -> tuple[ThemeSpec, bool, list[str], list[dict]]:
+    """Generate a ThemeSpec using Copilot with validation and repair.
+    
+    Returns (theme, fallback_used, issues, ai_metas).
+    """
     if is_sensitive_topic(topic):
         fallback = get_theme_by_id(DEFAULT_THEME_ID)
-        return fallback, True, ["Sensitive topic detected; using safe theme."]
+        return fallback, True, ["Sensitive topic detected; using safe theme."], []
 
     vibes = analyze_topic(topic)
     base_theme = select_theme_base(vibes)
     base_theme = apply_intensity(base_theme, intensity)
     issues: list[str] = []
     fallback_used = False
+    ai_metas: list[dict] = []
 
     theme_ids = ", ".join(sorted(THEME_LIBRARY.keys()))
     font_keys = ", ".join(sorted(FONT_STACKS.keys()))
@@ -434,7 +442,8 @@ async def generate_theme_spec(topic: str, intensity: str) -> tuple[ThemeSpec, bo
     )
 
     try:
-        content = await generate_with_copilot(prompt, system_message=THEME_SYSTEM_PROMPT, caller="generate_theme")
+        content, meta = await generate_with_copilot(prompt, system_message=THEME_SYSTEM_PROMPT, caller="generate_theme")
+        ai_metas.append(meta)
         theme_id, deltas = parse_theme_patch_from_response(content)
         selected = get_theme_by_id(theme_id) if theme_id else None
         if selected:
@@ -452,25 +461,26 @@ async def generate_theme_spec(topic: str, intensity: str) -> tuple[ThemeSpec, bo
                 f"Fix the following theme issues: {issues}\n\n"
                 f"Current theme: {base_theme.model_dump(by_alias=True)}"
             )
-            repaired_content = await generate_with_copilot(
+            repaired_content, repair_meta = await generate_with_copilot(
                 repair_prompt,
                 system_message=THEME_REPAIR_PROMPT,
                 caller="repair_theme",
             )
+            ai_metas.append(repair_meta)
             repaired_theme = parse_theme_spec_from_response(repaired_content)
             repaired_theme = apply_intensity(repaired_theme, intensity)
             repair_issues = validate_theme_spec(repaired_theme)
             if not repair_issues:
-                return repaired_theme, False, []
+                return repaired_theme, False, [], ai_metas
             issues = repair_issues
         except Exception as e:
             issues.append(f"Repair failed: {e}")
 
         fallback = get_theme_by_id(DEFAULT_THEME_ID)
         fallback_used = True
-        return fallback, fallback_used, issues
+        return fallback, fallback_used, issues, ai_metas
 
-    return base_theme, fallback_used, issues
+    return base_theme, fallback_used, issues, ai_metas
 
 
 def find_copilot_cli() -> Optional[str]:
@@ -527,8 +537,11 @@ async def generate_with_copilot(
     system_message: str = QUIZ_SYSTEM_PROMPT,
     model: Optional[str] = None,
     caller: str = "generate_with_copilot",
-) -> str:
-    """Generate content using Copilot CLI directly (non-interactive mode)"""
+) -> tuple[str, dict]:
+    """Generate content using Copilot CLI directly (non-interactive mode).
+    
+    Returns (content, ai_meta) where ai_meta contains model, token and timing info.
+    """
 
     if not model:
         model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-4.1")
@@ -636,7 +649,7 @@ USER REQUEST:
             copilot_log.warning("EMPTY RESPONSE from Copilot CLI")
 
         # Finalise tracking – this writes the JSONL token record
-        tracker.finish(
+        record = tracker.finish(
             success=True,
             exit_code=process.returncode,
             stderr_text=stderr_text,
@@ -644,7 +657,8 @@ USER REQUEST:
             response_chars=len(stdout_text),
         )
 
-        return stdout_text
+        ai_meta = _build_ai_meta(record)
+        return stdout_text, ai_meta
 
     except asyncio.TimeoutError:
         tracker.finish(success=False, error="Timeout after 120s")
@@ -660,6 +674,52 @@ USER REQUEST:
             )
         copilot_log.error("Full traceback:\n%s", traceback.format_exc())
         raise
+
+
+def _build_ai_meta(record: dict) -> dict:
+    """Build a frontend-friendly AI metadata dict from a CopilotCallTracker record."""
+    usage = record.get("token_usage") or {}
+    return {
+        "model": record.get("model", "unknown"),
+        "endpoint": record.get("endpoint", "unknown"),
+        "prompt_chars": record.get("prompt_chars", 0),
+        "response_chars": record.get("response_chars", 0),
+        "elapsed_ms": record.get("elapsed_ms", 0),
+        "success": record.get("success", False),
+        "error": record.get("error"),
+        "token_usage": {
+            "prompt_tokens": usage.get("prompt_tokens", usage.get("prompt_tokens_est")),
+            "completion_tokens": usage.get("completion_tokens", usage.get("completion_tokens_est")),
+            "total_tokens": usage.get("total_tokens", usage.get("total_tokens_est")),
+            "estimated": usage.get("estimated", False),
+            "ratelimit_remaining_tokens": usage.get("ratelimit_remaining_tokens"),
+            "ratelimit_remaining_requests": usage.get("ratelimit_remaining_requests"),
+        },
+        "timestamp": record.get("timestamp"),
+    }
+
+
+def _merge_ai_meta(*metas: dict) -> dict:
+    """Merge multiple AI meta dicts into a combined summary."""
+    if len(metas) == 1:
+        return metas[0]
+    calls = list(metas)
+    total_prompt = sum(m.get("token_usage", {}).get("prompt_tokens") or 0 for m in calls)
+    total_completion = sum(m.get("token_usage", {}).get("completion_tokens") or 0 for m in calls)
+    total_elapsed = sum(m.get("elapsed_ms", 0) for m in calls)
+    any_estimated = any(m.get("token_usage", {}).get("estimated", False) for m in calls)
+    return {
+        "calls": calls,
+        "total_calls": len(calls),
+        "model": calls[0].get("model", "unknown"),
+        "total_elapsed_ms": total_elapsed,
+        "total_token_usage": {
+            "prompt_tokens": total_prompt,
+            "completion_tokens": total_completion,
+            "total_tokens": total_prompt + total_completion,
+            "estimated": any_estimated,
+        },
+    }
 
 
 # --- Timer Logic ---
@@ -2023,8 +2083,9 @@ async def generate_theme(
         intensity = "subtle"
 
     try:
-        theme, fallback, issues = await generate_theme_spec(topic, intensity)
-        return GenerateThemeResponse(theme=theme, fallback=fallback, issues=issues or None)
+        theme, fallback, issues, ai_metas = await generate_theme_spec(topic, intensity)
+        meta = _merge_ai_meta(*ai_metas) if ai_metas else None
+        return GenerateThemeResponse(theme=theme, fallback=fallback, issues=issues or None, ai_meta=meta)
     except Exception as e:
         logger.error(f"Theme generation failed: {e}")
         fallback_theme = get_theme_by_id(DEFAULT_THEME_ID)
@@ -2065,7 +2126,7 @@ async def generate_questions(
 Remember to output ONLY valid JSON with the questions array."""
 
     try:
-        content = await generate_with_copilot(prompt, caller="generate_questions")
+        content, ai_meta = await generate_with_copilot(prompt, caller="generate_questions")
         questions = parse_questions_from_response(content)
         
         if len(questions) < request.count // 2:
@@ -2076,7 +2137,8 @@ Remember to output ONLY valid JSON with the questions array."""
         
         return GenerateQuestionsResponse(
             questions=questions,
-            generation_time_ms=elapsed_ms
+            generation_time_ms=elapsed_ms,
+            ai_meta=ai_meta
         )
         
     except Exception as e:
@@ -2156,7 +2218,7 @@ Make the questions {'more challenging' if suggested_difficulty == 'hard' else 'm
 Output ONLY valid JSON with the questions array."""
 
     try:
-        content = await generate_with_copilot(prompt, caller="generate_dynamic_batch")
+        content, ai_meta = await generate_with_copilot(prompt, caller="generate_dynamic_batch")
         questions = parse_questions_from_response(content)
         
         logger.info(f"✅ Dynamic batch #{request.batch_number}: {len(questions)} questions at {suggested_difficulty} difficulty")
@@ -2165,7 +2227,8 @@ Output ONLY valid JSON with the questions array."""
             questions=questions,
             suggested_difficulty=suggested_difficulty,
             difficulty_reason=difficulty_reason,
-            batch_number=request.batch_number
+            batch_number=request.batch_number,
+            ai_meta=ai_meta
         )
         
     except Exception as e:
@@ -2199,7 +2262,7 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
 }}"""
 
     try:
-        content = await generate_with_copilot(
+        content, ai_meta = await generate_with_copilot(
             prompt,
             system_message="You are a fact-checker. Verify trivia answers accurately and concisely. Output ONLY valid JSON.",
             caller="fact_check",
@@ -2243,7 +2306,8 @@ Verify if the claimed answer is correct. Respond with ONLY valid JSON:
                 verified=verified,
                 confidence=confidence,
                 explanation=str(data.get('explanation', 'Unable to verify')),
-                source_hint=str(data.get('source_hint')) if data.get('source_hint') else None
+                source_hint=str(data.get('source_hint')) if data.get('source_hint') else None,
+                ai_meta=ai_meta
             )
         else:
             logger.error(f"❌ No JSON found in fact-check response")
@@ -2288,6 +2352,33 @@ if FRONTEND_DIR.exists():
 
 
 # Catch-all route MUST be defined last, after all API routes
+@app.get("/api/dev/info")
+async def dev_info():
+    """Return system info for the Dev Mode inspector panel."""
+    cli_path = find_copilot_cli()
+    model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-4.1")
+    valid_models = [
+        "claude-sonnet-4.5", "claude-haiku-4.5", "claude-opus-4.5", "claude-sonnet-4",
+        "gemini-3-pro-preview", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1-codex-max",
+        "gpt-5.1-codex", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1"
+    ]
+    return {
+        "copilot_sdk_available": COPILOT_SDK_AVAILABLE,
+        "copilot_module_info": COPILOT_MODULE_INFO,
+        "copilot_cli_path": cli_path,
+        "active_model": model,
+        "valid_models": valid_models,
+        "auth_configured": bool(QUIZ_AUTH_SECRET),
+        "active_sessions": len(sessions),
+        "python_version": sys.version,
+        "system_prompts": {
+            "quiz": QUIZ_SYSTEM_PROMPT[:200] + "...",
+            "theme": THEME_SYSTEM_PROMPT[:200] + "...",
+            "theme_repair": THEME_REPAIR_PROMPT[:200] + "...",
+        },
+    }
+
+
 # This serves the SPA for client-side routing
 @app.api_route("/{full_path:path}", methods=["GET"], include_in_schema=False)
 async def serve_spa(full_path: str):

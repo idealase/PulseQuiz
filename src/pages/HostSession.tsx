@@ -12,6 +12,7 @@ import {
   ChallengeDetail
 } from '../types'
 import { useSessionLeaveGuard } from '../hooks/useSessionLeaveGuard'
+import { useAITelemetry } from '../context/AITelemetryContext'
 
 interface FactCheckResult {
   verified: boolean
@@ -41,6 +42,8 @@ export default function HostSession() {
   const [questionStats, setQuestionStats] = useState<QuestionStats | null>(null)
   const [showLiveStats, setShowLiveStats] = useState(true)
   
+  const { recordCall } = useAITelemetry()
+
   // Fact-check state
   const [factCheckResults, setFactCheckResults] = useState<Record<number, FactCheckResult>>({})
   const [factCheckLoading, setFactCheckLoading] = useState<number | null>(null)
@@ -437,6 +440,8 @@ export default function HostSession() {
         previous_difficulty: dynamicConfig.lastDifficulty || 'medium',
         performance: performanceData
       }, dynamicConfig.authToken)
+
+      if (result.ai_meta) recordCall('generate_dynamic_batch', result.ai_meta)
       
       // Append questions mid-session using the new endpoint
       if (result.questions.length > 0) {
@@ -485,6 +490,8 @@ export default function HostSession() {
         claimed_answer: correctAnswer,
         all_options: allOptions
       }, authToken)
+
+      if (result.ai_meta) recordCall('fact_check', result.ai_meta)
       
       setFactCheckResults(prev => ({
         ...prev,
