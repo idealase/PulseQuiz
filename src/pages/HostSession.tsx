@@ -1277,9 +1277,9 @@ export default function HostSession() {
                             onChange={(e) => setResolutionDraft(prev => ({ ...prev, status: e.target.value }))}
                             className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
                           >
-                            <option value="open">Open</option>
-                            <option value="under_review">Under Review</option>
-                            <option value="resolved">Resolved</option>
+                            <option value="open" className="bg-gray-800 text-white">Open</option>
+                            <option value="under_review" className="bg-gray-800 text-white">Under Review</option>
+                            <option value="resolved" className="bg-gray-800 text-white">Resolved</option>
                           </select>
                         </label>
                         <label className="text-xs text-white/60">Verdict
@@ -1288,10 +1288,10 @@ export default function HostSession() {
                             onChange={(e) => setResolutionDraft(prev => ({ ...prev, verdict: e.target.value }))}
                             className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
                           >
-                            <option value="">Select</option>
-                            <option value="valid">Valid</option>
-                            <option value="invalid">Invalid</option>
-                            <option value="ambiguous">Ambiguous</option>
+                            <option value="" className="bg-gray-800 text-white">Select</option>
+                            <option value="valid" className="bg-gray-800 text-white">Valid – original answer is correct</option>
+                            <option value="invalid" className="bg-gray-800 text-white">Invalid – question/answer is wrong</option>
+                            <option value="ambiguous" className="bg-gray-800 text-white">Ambiguous – multiple answers defensible</option>
                           </select>
                         </label>
                       </div>
@@ -1365,9 +1365,9 @@ export default function HostSession() {
                           onChange={(e) => setReconcilePolicy(e.target.value)}
                           className="mt-1 w-full rounded-lg bg-white/10 border border-white/20 px-2 py-1 text-sm"
                         >
-                          <option value="void">Void question</option>
-                          <option value="award_all">Award all</option>
-                          <option value="accept_multiple">Accept multiple answers</option>
+                          <option value="void" className="bg-gray-800 text-white">Void question – remove from scoring</option>
+                          <option value="award_all" className="bg-gray-800 text-white">Award all – give points to everyone</option>
+                          <option value="accept_multiple" className="bg-gray-800 text-white">Accept multiple answers</option>
                         </select>
                       </label>
                       {reconcilePolicy === 'accept_multiple' && (

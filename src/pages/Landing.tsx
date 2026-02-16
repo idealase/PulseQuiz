@@ -52,13 +52,6 @@ export default function Landing() {
         )}
 
         <Link
-          to="/settings"
-          className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-white/5 border border-white/20 hover:bg-white/15 hover:border-white/40 text-white/80 transition-all duration-300 hover:scale-105 active:scale-95"
-        >
-          Settings
-        </Link>
-        
-        <Link
           to="/watch"
           className="block w-full py-3 px-8 text-lg font-medium text-center rounded-2xl bg-purple-500/20 border border-purple-500/50 hover:bg-purple-500/30 hover:border-purple-500 text-purple-300 transition-all duration-300 hover:scale-105 active:scale-95"
         >

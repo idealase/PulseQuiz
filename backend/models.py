@@ -37,6 +37,7 @@ class SessionState(BaseModel):
     roundSize: int = 10
     settings: GameSettings = GameSettings()
     timerRemaining: Optional[int] = None  # Seconds remaining on current question
+    theme: Optional[dict] = None  # ThemeSpec propagated from host
 
 
 class PlayerResult(BaseModel):
@@ -152,6 +153,7 @@ class Session:
     timer_task: Optional[object] = None  # asyncio Task reference
     auto_progress_mode: bool = False
     auto_progress_percent: int = 90
+    theme: Optional[dict] = None  # ThemeSpec dict to propagate to all clients
     challenges: dict[int, dict[str, ChallengeSubmission]] = field(default_factory=dict)
     challenge_resolutions: dict[int, ChallengeResolution] = field(default_factory=dict)
     ai_verifications: dict[int, AIVerification] = field(default_factory=dict)
@@ -190,7 +192,8 @@ class Session:
                 autoProgressMode=self.auto_progress_mode,
                 autoProgressPercent=self.auto_progress_percent
             ),
-            timerRemaining=self.timer_remaining
+            timerRemaining=self.timer_remaining,
+            theme=self.theme
         )
     
     def calculate_scores(self) -> None:

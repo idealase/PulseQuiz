@@ -53,10 +53,6 @@ export default function SoloPlay() {
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
   const [questionStartTime, setQuestionStartTime] = useState<number | null>(null)
-  const [feedbackByQuestion, setFeedbackByQuestion] = useState<Record<number, string>>({})
-  const [feedbackTypeByQuestion, setFeedbackTypeByQuestion] = useState<Record<number, string>>({})
-  const [feedbackSending, setFeedbackSending] = useState<number | null>(null)
-  const [feedbackSent, setFeedbackSent] = useState<Record<number, boolean>>({})
 
   // Timer
   const [timerEnabled, setTimerEnabled] = useState(false)
@@ -341,35 +337,6 @@ export default function SoloPlay() {
       correct: isCorrect,
       responseTimeMs
     }])
-  }
-
-  const handleSubmitFeedback = async (questionIndex: number, selectedChoiceOverride?: number | null) => {
-    const question = questions[questionIndex]
-    if (!question) return
-
-    const message = (feedbackByQuestion[questionIndex] || '').trim()
-    if (!message) {
-      setError('Please enter feedback before sending')
-      return
-    }
-
-    const selectedChoice = selectedChoiceOverride ?? selectedAnswer ?? null
-
-    setFeedbackSending(questionIndex)
-    try {
-      await api.submitSoloFeedback({
-        question: question.question,
-        options: question.options,
-        message,
-        feedbackType: feedbackTypeByQuestion[questionIndex] || 'question',
-        selectedChoice,
-        correctChoice: question.correct
-      })
-      setFeedbackSent(prev => ({ ...prev, [questionIndex]: true }))
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to send feedback')
-    }
-    setFeedbackSending(null)
   }
 
   const nextQuestion = async () => {
@@ -750,7 +717,7 @@ export default function SoloPlay() {
             })}
           </div>
 
-          {/* Result feedback */}
+          {/* Result display */}
           {showResult && (
             <div className="mt-3 text-center animate-slide-up shrink-0">
               {selectedAnswer === currentQuestion.correct ? (
@@ -770,41 +737,6 @@ export default function SoloPlay() {
               {currentQuestion.explanation && (
                 <p className="text-white/70 text-sm mb-2">{currentQuestion.explanation}</p>
               )}
-
-              <div className="mt-3 max-w-xl mx-auto text-left bg-white/5 border border-white/10 rounded-xl p-3">
-                <div className="flex items-center gap-2 mb-2">
-                  <label className="text-xs text-white/60">Feedback about</label>
-                  <select
-                    value={feedbackTypeByQuestion[currentIndex] || 'question'}
-                    onChange={(e) => setFeedbackTypeByQuestion(prev => ({ ...prev, [currentIndex]: e.target.value }))}
-                    className="bg-white/10 border border-white/20 rounded-md text-xs px-2 py-1"
-                    disabled={feedbackSent[currentIndex]}
-                  >
-                    <option value="question">Question</option>
-                    <option value="answer">Answer</option>
-                    <option value="both">Both</option>
-                    <option value="other">Other</option>
-                  </select>
-                </div>
-                <textarea
-                  value={feedbackByQuestion[currentIndex] || ''}
-                  onChange={(e) => setFeedbackByQuestion(prev => ({ ...prev, [currentIndex]: e.target.value }))}
-                  placeholder="Spot an issue? Tell us right away..."
-                  rows={2}
-                  className="w-full text-xs px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-secondary focus:outline-none"
-                  disabled={feedbackSent[currentIndex]}
-                />
-                <div className="mt-2 flex items-center justify-between">
-                  <span className="text-xs text-white/40">Feedback goes to backend logs</span>
-                  <button
-                    onClick={() => handleSubmitFeedback(currentIndex)}
-                    disabled={feedbackSent[currentIndex] || feedbackSending === currentIndex}
-                    className="px-3 py-1 text-xs font-semibold rounded-lg bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {feedbackSent[currentIndex] ? 'Sent' : feedbackSending === currentIndex ? 'Sending...' : 'Send'}
-                  </button>
-                </div>
-              </div>
 
               <button
                 onClick={nextQuestion}
@@ -887,41 +819,6 @@ export default function SoloPlay() {
                         Correct: {q.options[q.correct]}
                       </p>
                     )}
-
-                    <div className="mt-3 pt-3 border-t border-white/10">
-                      <div className="flex items-center gap-2 mb-2">
-                        <label className="text-xs text-white/60">Feedback about</label>
-                        <select
-                          value={feedbackTypeByQuestion[answer.questionIndex] || 'question'}
-                          onChange={(e) => setFeedbackTypeByQuestion(prev => ({ ...prev, [answer.questionIndex]: e.target.value }))}
-                          className="bg-white/10 border border-white/20 rounded-md text-xs px-2 py-1"
-                          disabled={feedbackSent[answer.questionIndex]}
-                        >
-                          <option value="question">Question</option>
-                          <option value="answer">Answer</option>
-                          <option value="both">Both</option>
-                          <option value="other">Other</option>
-                        </select>
-                      </div>
-                      <textarea
-                        value={feedbackByQuestion[answer.questionIndex] || ''}
-                        onChange={(e) => setFeedbackByQuestion(prev => ({ ...prev, [answer.questionIndex]: e.target.value }))}
-                        placeholder="Tell us what's unclear or incorrect..."
-                        rows={2}
-                        className="w-full text-xs px-3 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-secondary focus:outline-none"
-                        disabled={feedbackSent[answer.questionIndex]}
-                      />
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-xs text-white/40">Feedback goes to backend logs</span>
-                        <button
-                          onClick={() => handleSubmitFeedback(answer.questionIndex, answer.selected)}
-                          disabled={feedbackSent[answer.questionIndex] || feedbackSending === answer.questionIndex}
-                          className="px-3 py-1 text-xs font-semibold rounded-lg bg-white/20 hover:bg-white/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {feedbackSent[answer.questionIndex] ? 'Sent' : feedbackSending === answer.questionIndex ? 'Sending...' : 'Send'}
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 )
               })}

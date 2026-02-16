@@ -194,6 +194,10 @@ export default function HostCreate() {
             intensity
           }, aiAuthToken)
           applyTheme(themeResult.theme)
+          // Propagate theme to session so players get it
+          if (sessionCode && hostToken) {
+            api.setSessionTheme(sessionCode, hostToken, themeResult.theme).catch(() => {})
+          }
         } catch (themeError) {
           console.warn('Theme generation failed', themeError)
         } finally {
@@ -248,6 +252,10 @@ export default function HostCreate() {
         intensity
       }, aiAuthToken)
       applyTheme(themeResult.theme)
+      // Propagate theme to session so players get it
+      if (sessionCode && hostToken) {
+        api.setSessionTheme(sessionCode, hostToken, themeResult.theme).catch(() => {})
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Theme preview failed')
     }
