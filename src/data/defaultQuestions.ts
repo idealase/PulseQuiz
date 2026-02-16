@@ -1,7 +1,7 @@
 import { Question } from '../types'
 
 // Question Set Type
-export type QuestionSetId = 'general' | 'expert' | 'startup'
+export type QuestionSetId = 'general' | 'expert' | 'startup' | 'wines-australia' | 'ai-tech' | 'trash-trivia'
 
 export interface QuestionSet {
   id: QuestionSetId
@@ -683,6 +683,378 @@ export const startupQuestions: Question[] = [
   }
 ]
 
+// Wines of Australia - grape varieties, regions, and cellar door knowledge
+export const winesOfAustraliaQuestions: Question[] = [
+  {
+    question: "What grape variety is the Barossa Valley most famous for?",
+    options: ["Shiraz", "Cabernet Sauvignon", "Chardonnay", "Pinot Noir"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which Australian wine region is renowned for its Riesling?",
+    options: ["Clare Valley", "Hunter Valley", "Yarra Valley", "Margaret River"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is Penfolds Grange's primary grape variety?",
+    options: ["Shiraz", "Cabernet Sauvignon", "Merlot", "Grenache"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which state is Margaret River located in?",
+    options: ["Western Australia", "South Australia", "Victoria", "New South Wales"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What Australian region is called the 'Hunter' and famous for Semillon?",
+    options: ["Hunter Valley", "Barossa Valley", "McLaren Vale", "Eden Valley"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What winemaking technique involves skin contact for white wines?",
+    options: ["Orange wine", "Rosé", "Champagne method", "Cold soak"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'terroir' refer to in winemaking?",
+    options: ["Environmental conditions that affect grape character", "The barrel aging process", "A type of grape clone", "Wine bottle labelling regulations"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which Victorian region is best known for Pinot Noir?",
+    options: ["Yarra Valley", "Rutherglen", "King Valley", "Geelong"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the traditional Rutherglen specialty fortified wine?",
+    options: ["Muscat", "Port", "Sherry", "Madeira"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'GSM' stand for in Australian wine blends?",
+    options: ["Grenache-Shiraz-Mourvèdre", "Gewürztraminer-Sauvignon-Marsanne", "Graciano-Sangiovese-Malbec", "Grüner-Silvaner-Muscat"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What Australian wine classification is similar to France's Grand Cru?",
+    options: ["Langton's Classification", "Heritage Label", "First Growth", "Outstanding Vineyard"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which region's Cabernet Sauvignon rivals Bordeaux in reputation?",
+    options: ["Coonawarra", "Barossa Valley", "Hunter Valley", "Adelaide Hills"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the distinctive red soil of Coonawarra called?",
+    options: ["Terra rossa", "Laterite", "Red clay", "Ironstone"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What winery produced the first commercial Australian Chardonnay in the 1970s?",
+    options: ["Tyrrell's", "Penfolds", "Lindeman's", "Wolf Blass"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'old vine' typically mean for Barossa Shiraz?",
+    options: ["Vines over 35 years old", "Vines over 100 years old", "Vines planted before 2000", "Vines from original cuttings only"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What cool-climate Tasmanian region is gaining fame for sparkling wine?",
+    options: ["Tamar Valley", "Huon Valley", "Derwent Valley", "Coal River Valley"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the most planted white grape variety in Australia?",
+    options: ["Chardonnay", "Sauvignon Blanc", "Riesling", "Semillon"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What iconic brand created the Yellow Label Cabernet Sauvignon?",
+    options: ["Wolf Blass", "Jacob's Creek", "Penfolds", "Henschke"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What Adelaide Hills winery is famous for Sauvignon Blanc and 'The Dead Arm' Shiraz?",
+    options: ["d'Arenberg", "Shaw + Smith", "Henschke", "Torbreck"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'méthode traditionnelle' mean on an Australian sparkling wine?",
+    options: ["Bottle-fermented like Champagne", "Made with Prosecco grapes", "Tank-fermented in bulk", "Naturally carbonated by spring water"],
+    correct: 0,
+    points: 1
+  }
+]
+
+// AI Tech & Business Post-2020 - the big moves in artificial intelligence and tech business
+export const aiTechQuestions: Question[] = [
+  {
+    question: "What company released ChatGPT in November 2022?",
+    options: ["OpenAI", "Google", "Meta", "Anthropic"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What architecture underpins most modern large language models?",
+    options: ["Transformer", "LSTM", "Convolutional neural network", "Recurrent neural network"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'RLHF' stand for in model training?",
+    options: ["Reinforcement Learning from Human Feedback", "Recursive Language Handling Framework", "Retrieval-Linked Hyperparameter Fitting", "Reinforced Latent Hidden Features"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "Which company created the Gemini family of AI models?",
+    options: ["Google DeepMind", "OpenAI", "Anthropic", "Meta"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What GPU maker's stock price surged past $1 trillion due to AI demand?",
+    options: ["NVIDIA", "AMD", "Intel", "Qualcomm"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What technique fine-tunes models using low-rank matrix decomposition?",
+    options: ["LoRA", "RLHF", "Distillation", "Quantization"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What AI company was founded by ex-OpenAI researchers including Dario Amodei?",
+    options: ["Anthropic", "Cohere", "Stability AI", "Mistral"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What was the name of Meta's open-source LLM family released in 2023?",
+    options: ["LLaMA", "Galactica", "OPT", "BlenderBot"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What AI image generator went viral in mid-2022?",
+    options: ["DALL-E 2", "GPT-4", "AlphaFold", "Copilot"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What term describes AI systems that can match human-level performance across tasks?",
+    options: ["AGI (Artificial General Intelligence)", "ASI (Artificial Super Intelligence)", "ANI (Artificial Narrow Intelligence)", "ACI (Artificial Cognitive Intelligence)"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What Microsoft product integrated GPT-4 as 'Copilot' across Office apps?",
+    options: ["Microsoft 365", "Azure", "Windows 11", "Teams"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What 2024 EU regulation governs AI risk categories?",
+    options: ["EU AI Act", "GDPR Amendment", "Digital Services Act", "AI Safety Framework"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What open-source AI lab from France released the Mixtral models?",
+    options: ["Mistral AI", "Hugging Face", "Aleph Alpha", "LightOn"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What reasoning technique asks a model to 'think step by step'?",
+    options: ["Chain-of-thought prompting", "Few-shot learning", "Constitutional AI", "Beam search"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What company acquired Twitter in 2022 and rebranded it to X?",
+    options: ["xAI / Elon Musk", "Meta", "Microsoft", "Alphabet"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What benchmark measures LLM performance across reasoning tasks?",
+    options: ["MMLU", "ImageNet", "GLUE", "SQuAD"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What does 'MoE' stand for in model architecture (e.g., Mixtral)?",
+    options: ["Mixture of Experts", "Model of Everything", "Multi-objective Evaluation", "Maximum Output Efficiency"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What AI coding assistant was launched by GitHub in 2021?",
+    options: ["GitHub Copilot", "CodeWhisperer", "Tabnine", "Replit Ghost"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What DeepMind system predicted 3D protein structures for nearly all known proteins?",
+    options: ["AlphaFold 2", "AlphaGo", "Gato", "Gemini"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What Sam Altman quote became a meme after his brief firing from OpenAI in November 2023?",
+    options: ["\"I loved my time at OpenAI\"", "\"AGI is near\"", "\"We should slow down\"", "\"AI will save us all\""],
+    correct: 0,
+    points: 1
+  }
+]
+
+// Trash Trivia - absurd, obscure, and delightfully useless facts
+export const trashTriviaQuestions: Question[] = [
+  {
+    question: "What is the official state snack of Utah?",
+    options: ["Jell-O", "Beef jerky", "Trail mix", "Cheese curds"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "How many times does the average person fart per day?",
+    options: ["14", "3", "25", "40"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What animal's poop is cube-shaped?",
+    options: ["Wombat", "Koala", "Platypus", "Quokka"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What was the original name of the search engine Google?",
+    options: ["BackRub", "SearchBuddy", "WebCrawler", "NetSeek"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What colour is a hippopotamus's sweat?",
+    options: ["Red", "Clear", "Yellow", "Blue"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What fruit was originally called a 'love apple'?",
+    options: ["Tomato", "Strawberry", "Pomegranate", "Peach"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is the fear of long words called?",
+    options: ["Hippopotomonstrosesquippedaliophobia", "Sesquipedalophobia", "Verbophobia", "Logophobia"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "How many years did the Hundred Years' War actually last?",
+    options: ["116", "100", "99", "105"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What country has the most vending machines per capita?",
+    options: ["Japan", "United States", "South Korea", "Germany"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What popular snack was originally invented as a wallpaper cleaner?",
+    options: ["Play-Doh", "Pringles", "Cotton candy", "Bubble gum"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is a group of flamingos called?",
+    options: ["A flamboyance", "A flock", "A flutter", "A blush"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What was Buzz Aldrin's mother's maiden name?",
+    options: ["Moon", "Star", "Armstrong", "Shepard"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "How long is a jiffy (in physics)?",
+    options: ["1/100th of a second", "1 millisecond", "1 nanosecond", "1 microsecond"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What creature has three hearts?",
+    options: ["Octopus", "Starfish", "Earthworm", "Jellyfish"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What is illegal to do in Singapore that most people do daily?",
+    options: ["Chew gum", "Jaywalk", "Whistle at night", "Eat on the train"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What company originally sold only books?",
+    options: ["Amazon", "Apple", "eBay", "Walmart"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What sport has been played on the Moon?",
+    options: ["Golf", "Tennis", "Cricket", "Frisbee"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What body part continues to grow your entire life?",
+    options: ["Nose and ears", "Fingers", "Feet", "Teeth"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What percentage of the Earth's water is fresh water?",
+    options: ["About 3%", "About 10%", "About 25%", "About 50%"],
+    correct: 0,
+    points: 1
+  },
+  {
+    question: "What fast food chain once had a mascot with a giant head called 'The King'?",
+    options: ["Burger King", "McDonald's", "Wendy's", "KFC"],
+    correct: 0,
+    points: 1
+  }
+]
+
 // Legacy export for backward compatibility
 export const defaultQuestions = generalQuestions
 
@@ -708,6 +1080,27 @@ export const questionSets: QuestionSet[] = [
     emoji: '🚀',
     description: 'VC, business, and tech state of the art',
     questions: startupQuestions
+  },
+  {
+    id: 'wines-australia',
+    name: 'Wines of Australia',
+    emoji: '🍷',
+    description: 'Grape varieties, regions, and cellar door knowledge',
+    questions: winesOfAustraliaQuestions
+  },
+  {
+    id: 'ai-tech',
+    name: 'AI Tech & Business',
+    emoji: '🤖',
+    description: 'Artificial intelligence and tech headlines post-2020',
+    questions: aiTechQuestions
+  },
+  {
+    id: 'trash-trivia',
+    name: 'Trash Trivia',
+    emoji: '🗑️',
+    description: 'Absurd, obscure, and delightfully useless facts',
+    questions: trashTriviaQuestions
   }
 ]
 
