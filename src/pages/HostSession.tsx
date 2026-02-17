@@ -969,69 +969,85 @@ export default function HostSession() {
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-xl p-6">
-            <h2 className={`${presentationMode ? 'text-3xl md:text-4xl' : 'text-xl md:text-2xl'} font-bold mb-6`}>
+          <div className={`bg-white/10 rounded-xl p-6 ${isHostPlayer && !presentationMode ? '' : 'mb-0'}`}>
+            <h2 className={`${presentationMode ? 'text-3xl md:text-4xl' : 'text-xl md:text-2xl'} font-bold ${isHostPlayer && !presentationMode ? 'mb-0' : 'mb-6'}`}>
               {currentQuestion.question}
             </h2>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentQuestion.options.map((opt, i) => (
-                <div
-                  key={i}
-                  className="p-4 bg-white/10 rounded-xl text-center"
-                >
-                  <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
-                  {opt}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Host Player Answer Panel */}
-          {isHostPlayer && !presentationMode && (
-            <div className="bg-white/10 rounded-xl p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <p className="text-sm text-white/60">Your Answer</p>
-                  <p className="font-semibold">{hostDisplayName}</p>
-                </div>
-                <div className="text-sm text-white/60">
-                  {hostAnswerLocked ? 'Answer locked' : 'Select and confirm'}
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {/* Static options grid — hidden when host is also playing (they get the interactive version below) */}
+            {!(isHostPlayer && !presentationMode) && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-6">
                 {currentQuestion.options.map((opt, i) => (
-                  <button
+                  <div
                     key={i}
-                    type="button"
-                    onClick={() => handleHostSelectAnswer(i)}
-                    disabled={hostAnswerLocked || (session.settings?.timerMode && timerRemaining === 0)}
-                    className={`px-3 py-3 rounded-xl border text-left transition-all ${
-                      hostSelectedAnswer === i
-                        ? 'bg-slate-600/30 border-slate-600/60'
-                        : 'bg-white/5 border-white/10 hover:bg-white/10'
-                    } ${hostAnswerLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className="p-4 bg-white/10 rounded-xl text-center"
                   >
                     <span className="font-bold mr-2">{String.fromCharCode(65 + i)}.</span>
                     {opt}
-                  </button>
+                  </div>
                 ))}
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                {session.settings?.timerMode && timerRemaining === 0 && !hostAnswerLocked && (
-                  <span className="text-sm text-red-300">Time's up</span>
+            )}
+          </div>
+
+          {/* Host Player Answer Panel — styled like the player view */}
+          {isHostPlayer && !presentationMode && (() => {
+            const hostOptionColors = [
+              'bg-red-900/40',
+              'bg-blue-900/40',
+              'bg-amber-900/40',
+              'bg-emerald-900/40',
+            ]
+            const timerExpired = session.settings?.timerMode && timerRemaining === 0
+            const isDisabled = hostAnswerLocked || timerExpired
+
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {currentQuestion.options.map((opt, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => handleHostSelectAnswer(i)}
+                      disabled={isDisabled}
+                      className={`px-4 py-3 rounded-xl text-left text-base font-medium leading-snug transition-all active:scale-[0.98] flex items-center ${
+                        isDisabled
+                          ? hostSelectedAnswer === i
+                            ? `${hostOptionColors[i]} opacity-100`
+                            : 'bg-white/5 opacity-50'
+                          : hostSelectedAnswer === i
+                            ? `${hostOptionColors[i]} ring-2 ring-white/30`
+                            : `${hostOptionColors[i]} opacity-80 hover:opacity-100`
+                      }`}
+                    >
+                      <span className="font-bold mr-2 shrink-0 text-lg">{String.fromCharCode(65 + i)}.</span>
+                      <span className="line-clamp-2 md:line-clamp-3">{opt}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Lock-in bar — matches player view */}
+                {!hostAnswerLocked && !timerExpired ? (
+                  <button
+                    type="button"
+                    onClick={submitHostAnswer}
+                    disabled={hostSelectedAnswer === null}
+                    className="w-full py-3 text-lg font-semibold rounded-xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                  >
+                    Lock In Answer
+                  </button>
+                ) : hostAnswerLocked ? (
+                  <div className="py-3 text-lg font-bold text-center rounded-xl bg-green-500/20 border border-green-500">
+                    ✓ Answer Locked
+                  </div>
+                ) : (
+                  <div className="py-3 text-lg font-bold text-center rounded-xl bg-red-900/20 border border-red-800/30 text-red-300/80">
+                    Time Expired
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={submitHostAnswer}
-                  disabled={hostAnswerLocked || hostSelectedAnswer === null}
-                  className="ml-auto px-4 py-2 rounded-xl bg-white/10 border border-white/20 text-sm font-semibold hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {hostAnswerLocked ? 'Locked' : 'Lock Answer'}
-                </button>
-              </div>
-            </div>
-          )}
+              </>
+            )
+          })()}
 
           {/* Live Answer Distribution - Host View */}
           {showFullAdmin && (
