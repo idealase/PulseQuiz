@@ -47,6 +47,10 @@ export default function AudienceSession() {
           if (msg.state.theme) {
             applyTheme(msg.state.theme, false)
           }
+          // Restore reveal results on reconnect
+          if (msg.state.revealResults) {
+            setResults(msg.state.revealResults as RevealResults)
+          }
           // Handle initial leaderboard from session_state
           if ('leaderboard' in msg && Array.isArray(msg.leaderboard)) {
             setLeaderboard(msg.leaderboard as LiveLeaderboardEntry[])

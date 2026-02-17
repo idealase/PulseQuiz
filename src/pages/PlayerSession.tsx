@@ -144,6 +144,10 @@ export default function PlayerSession() {
           if (msg.state.theme) {
             applyTheme(msg.state.theme, false)
           }
+          // Restore reveal results on reconnect
+          if (msg.state.revealResults) {
+            setResults(msg.state.revealResults as RevealResults)
+          }
           break
         case 'player_joined':
           setSession(prev => prev ? {

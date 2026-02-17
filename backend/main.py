@@ -2045,9 +2045,20 @@ async def websocket_session(websocket: WebSocket, code: str):
             'state': session.to_state().model_dump()
         }
         
-        # For observers, also send current leaderboard and stats
-        if role == 'observer':
+        # Include reveal results when session is in revealed status
+        if session.status == 'revealed':
+            if role == 'player':
+                results = session.get_reveal_results(identifier)
+            else:
+                results = session.get_reveal_results()
+            state_msg['state']['revealResults'] = results.model_dump()
+        
+        # Include leaderboard for hosts and observers
+        if role in ('host', 'observer'):
             state_msg['leaderboard'] = [e.model_dump() for e in session.get_live_leaderboard()]
+        
+        # For observers, also send current stats
+        if role == 'observer':
             if session.status == 'playing':
                 state_msg['stats'] = session.get_question_stats(session.current_question_index).model_dump()
         

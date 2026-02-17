@@ -157,6 +157,14 @@ export default function HostSession() {
           if (msg.state.timerRemaining !== undefined) {
             setTimerRemaining(msg.state.timerRemaining)
           }
+          // Restore reveal results on reconnect
+          if (msg.state.revealResults) {
+            setResults(msg.state.revealResults as RevealResults)
+          }
+          // Restore leaderboard on reconnect
+          if ('leaderboard' in msg && Array.isArray(msg.leaderboard)) {
+            setLeaderboard(msg.leaderboard as LiveLeaderboardEntry[])
+          }
           break
         case 'player_joined':
           setSession(prev => prev ? {
