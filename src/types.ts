@@ -77,6 +77,7 @@ export interface SessionState {
   settings: GameSettings
   timerRemaining?: number
   theme?: ThemeSpec | null
+  revealResults?: RevealResults
 }
 
 export interface AnswerStatus {

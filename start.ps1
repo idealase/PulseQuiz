@@ -105,13 +105,17 @@ if (Test-Path $venvPath) {
 }
 
 # Check Copilot CLI
-$copilotCli = Get-Command copilot -ErrorAction SilentlyContinue
-if ($copilotCli) {
-    $copilotVersion = copilot --version 2>&1
-    Write-Host "🤖 Copilot CLI: ✅ $copilotVersion" -ForegroundColor Green
+if (Get-Command gh -ErrorAction SilentlyContinue) {
+    $copilotVersion = gh copilot --version 2>&1
+    if ($copilotVersion -match '^version') {
+        Write-Host "🤖 Copilot CLI: ✅ $copilotVersion" -ForegroundColor Green
+    } else {
+        Write-Host "🤖 Copilot CLI: ❌ Not found (AI features disabled)" -ForegroundColor Red
+        Write-Host "   Install: gh extension install github/gh-copilot" -ForegroundColor Gray
+    }
 } else {
-    Write-Host "🤖 Copilot CLI: ❌ Not found (AI features disabled)" -ForegroundColor Red
-    Write-Host "   Install: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli" -ForegroundColor Gray
+    Write-Host "🤖 GitHub CLI: ❌ Not found" -ForegroundColor Red
+    Write-Host "   Install: https://cli.github.com/" -ForegroundColor Gray
 }
 
 # Check environment variables
@@ -119,7 +123,7 @@ Write-Host "`n🔑 Environment Variables" -ForegroundColor Cyan
 Write-Host "─────────────────────────" -ForegroundColor Gray
 
 if ($env:QUIZ_AUTH_SECRET) {
-    Write-Host "   QUIZ_AUTH_SECRET: ✅ Set (${($env:QUIZ_AUTH_SECRET.Length)} chars)" -ForegroundColor Green
+    Write-Host "   QUIZ_AUTH_SECRET: ✅ Set ($($env:QUIZ_AUTH_SECRET.Length) chars)" -ForegroundColor Green
 } else {
     Write-Host "   QUIZ_AUTH_SECRET: ⚠️ Not set (AI endpoints unprotected!)" -ForegroundColor Yellow
 }
@@ -287,20 +291,20 @@ Write-Host "`n⚡ Starting uvicorn on port $Port..." -ForegroundColor Yellow
 $authSecret = $env:QUIZ_AUTH_SECRET
 $githubToken = $env:GITHUB_TOKEN
 $ghToken = $env:GH_TOKEN
-$copilotModel = $env:QUIZ_COPILOT_MODEL
+$copilotModelEnv = $env:QUIZ_COPILOT_MODEL
 
 $uvicornLogLevel = if ($VerboseLogging) { "debug" } else { "info" }
 $uvicornAccessLog = $VerboseLogging
 
 $backendJob = Start-Job -ScriptBlock {
-    param($path, $port, $authSecret, $githubToken, $ghToken, $copilotModel, $logLevel, $accessLog)
+    param($path, $port, $authSecret, $githubToken, $ghToken, $copilotModelEnv, $logLevel, $accessLog)
     Set-Location $path
-    
+
     # Set environment variables in the job
     if ($authSecret) { $env:QUIZ_AUTH_SECRET = $authSecret }
     if ($githubToken) { $env:GITHUB_TOKEN = $githubToken }
     if ($ghToken) { $env:GH_TOKEN = $ghToken }
-    if ($copilotModel) { $env:QUIZ_COPILOT_MODEL = $copilotModel }
+    if ($copilotModelEnv) { $env:QUIZ_COPILOT_MODEL = $copilotModelEnv }
     
     # Activate venv if it exists
     $venvActivate = Join-Path $path "venv\Scripts\Activate.ps1"
@@ -320,7 +324,7 @@ $backendJob = Start-Job -ScriptBlock {
     }
 
     python -m uvicorn @uvicornArgs
-} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken, $copilotModel, $uvicornLogLevel, $uvicornAccessLog
+} -ArgumentList $backendPath, $Port, $authSecret, $githubToken, $ghToken, $copilotModelEnv, $uvicornLogLevel, $uvicornAccessLog
 
 # Wait for backend to start
 Write-Host "⏳ Waiting for backend to initialize..." -ForegroundColor Gray
@@ -356,9 +360,9 @@ if (-not $UseNgrok) {
     Write-Host "✅ Cloudflare Tunnel connected" -ForegroundColor Green
     
     # Summary
-    Write-Host "`n" + "=" * 50 -ForegroundColor Cyan
+    Write-Host ("`n" + "=" * 50) -ForegroundColor Cyan
     Write-Host "🎉 PulseQuiz is ready!" -ForegroundColor Green
-    Write-Host "=" * 50 -ForegroundColor Cyan
+    Write-Host ("=" * 50) -ForegroundColor Cyan
     Write-Host "`n📍 Local:   http://localhost:$Port"
     Write-Host "📍 Public:  https://quiz.sandford.systems" -ForegroundColor Green
     Write-Host "`n✅ Works on corporate networks (Zscaler)" -ForegroundColor Green
@@ -469,9 +473,9 @@ else {
     }
     
     # Summary
-    Write-Host "`n" + "=" * 50 -ForegroundColor Cyan
+    Write-Host ("`n" + "=" * 50) -ForegroundColor Cyan
     Write-Host "🎉 PulseQuiz is ready!" -ForegroundColor Green
-    Write-Host "=" * 50 -ForegroundColor Cyan
+    Write-Host ("=" * 50) -ForegroundColor Cyan
     Write-Host "`n📍 Local Backend:  http://localhost:$Port"
     Write-Host "📍 Public API:     $ngrokUrl"
     Write-Host "📍 Frontend:       https://idealase.github.io/PulseQuiz/"
