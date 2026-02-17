@@ -13,6 +13,7 @@ export default function Settings() {
     intensity,
     experimentalTheme,
     applyTheme,
+    applyPreset,
     setLockTheme,
     setIntensity,
     setExperimentalTheme
@@ -64,6 +65,37 @@ export default function Settings() {
       </div>
 
       <div className="space-y-4">
+        <div className="rounded-xl bg-white/10 border border-white/20 px-4 py-4">
+          <div className="mb-3">
+            <p className="font-semibold">Visual Theme</p>
+            <p className="text-sm text-white/50">Choose your interface style</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => applyPreset('terminal')}
+              className={`px-4 py-3 rounded-lg border-2 text-left transition-all ${
+                theme.themeId === 'terminal'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-white/20 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="font-semibold text-sm">Terminal</div>
+              <div className="text-xs text-white/60 mt-0.5">Retro green phosphor</div>
+            </button>
+            <button
+              onClick={() => applyPreset('classic')}
+              className={`px-4 py-3 rounded-lg border-2 text-left transition-all ${
+                theme.themeId === 'classic'
+                  ? 'border-primary bg-primary/10'
+                  : 'border-white/20 bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="font-semibold text-sm">Classic</div>
+              <div className="text-xs text-white/60 mt-0.5">Slate blue</div>
+            </button>
+          </div>
+        </div>
+
         <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Experimental Theme Generation</p>

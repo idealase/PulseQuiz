@@ -31,29 +31,29 @@ export default function Landing() {
       <div className="flex flex-col gap-3 sm:gap-3.5 w-full max-w-md animate-slide-up" style={{ animationDelay: '0.1s' }}>
         <Link
           to="/solo"
-          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-xl bg-slate-700/60 border border-slate-600/50 hover:bg-slate-700/80 hover:border-slate-500/60 transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-lg bg-transparent border-2 border-current hover:bg-white/10 transition-all shadow-sm active:scale-[0.98]"
         >
           Solo Mode
         </Link>
 
         <Link
           to="/host"
-          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-xl bg-slate-600/50 border border-slate-500/40 hover:bg-slate-600/70 hover:border-slate-400/50 text-white transition-all shadow-sm hover:shadow-md active:scale-[0.98]"
+          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-lg bg-transparent border-2 border-current hover:bg-white/10 transition-all shadow-sm active:scale-[0.98]"
         >
           Start Game
         </Link>
 
         <Link
           to="/join"
-          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-xl bg-white/5 border border-white/15 hover:bg-white/10 hover:border-white/25 transition-all active:scale-[0.98]"
+          className="block w-full py-3.5 sm:py-4 px-6 sm:px-8 text-lg sm:text-xl font-semibold text-center rounded-lg bg-transparent border-2 border-white/30 hover:border-white/50 hover:bg-white/10 transition-all active:scale-[0.98]"
         >
           Join Game
         </Link>
-        
+
         {resumeInfo && resumeLabel && (
           <Link
             to={resumeInfo.path}
-            className="block w-full py-3 sm:py-3.5 px-6 sm:px-8 text-base sm:text-lg font-medium text-center rounded-xl bg-teal-900/30 border border-teal-700/30 hover:bg-teal-900/40 hover:border-teal-600/40 text-teal-300/80 transition-all active:scale-[0.98]"
+            className="block w-full py-3 sm:py-3.5 px-6 sm:px-8 text-base sm:text-lg font-medium text-center rounded-lg bg-transparent border-2 border-white/30 hover:border-white/50 hover:bg-white/10 transition-all active:scale-[0.98]"
           >
             {resumeLabel}
           </Link>
@@ -61,11 +61,11 @@ export default function Landing() {
 
         <Link
           to="/watch"
-          className="block w-full py-3 sm:py-3.5 px-6 sm:px-8 text-base sm:text-lg font-medium text-center rounded-xl bg-white/[0.03] border border-white/10 hover:bg-white/[0.06] hover:border-white/20 text-white/60 transition-all active:scale-[0.98]"
+          className="block w-full py-3 sm:py-3.5 px-6 sm:px-8 text-base sm:text-lg font-medium text-center rounded-lg bg-transparent border-2 border-white/20 hover:border-white/30 hover:bg-white/10 text-white/60 transition-all active:scale-[0.98]"
         >
           Watch Game
         </Link>
-        
+
       </div>
 
       <button
@@ -79,7 +79,7 @@ export default function Landing() {
       </button>
 
       {showHelp && (
-        <div className="mt-3 w-full max-w-md sm:max-w-lg animate-slide-up text-left space-y-4 bg-white/[0.03] border border-white/10 rounded-xl p-4 sm:p-6 max-h-[40vh] overflow-y-auto">
+        <div className="mt-3 w-full max-w-md sm:max-w-lg animate-slide-up text-left space-y-4 bg-transparent border-2 border-white/20 rounded-lg p-4 sm:p-6 max-h-[40vh] overflow-y-auto">
           <div>
             <h3 className="text-white/80 font-semibold text-sm tracking-wide uppercase mb-1.5">Solo Mode</h3>
             <p className="text-white/45 text-sm leading-relaxed">
