@@ -56,13 +56,13 @@ export default function AudienceJoin() {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter code"
               maxLength={6}
-              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest bg-white/10 border border-white/15 rounded-xl focus:outline-none focus:border-slate-500 uppercase placeholder:text-white/30"
+              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest bg-transparent border-2 border-white/30 rounded-lg focus:outline-none focus:border-current uppercase placeholder:text-white/30"
               autoFocus
             />
           </div>
 
           {error && (
-            <div className="p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+            <div className="p-4 bg-transparent border-2 border-red-500/50 rounded-lg text-red-300">
               {error}
             </div>
           )}
@@ -70,7 +70,7 @@ export default function AudienceJoin() {
           <button
             type="submit"
             disabled={loading || code.length < 4}
-            className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-semibold rounded-lg bg-transparent border-2 border-current hover:bg-white/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Connecting...' : 'Watch'}
           </button>

@@ -340,12 +340,12 @@ export default function PlayerSession() {
     return n + (s[(v - 20) % 10] || s[v] || s[0])
   }
 
-  // Option colors for visual variety
+  // Option colors for terminal aesthetic
   const optionColors = [
-    'bg-red-900/40',
-    'bg-blue-900/40',
-    'bg-amber-900/40',
-    'bg-emerald-900/40',
+    'bg-transparent border-2 border-red-500/60',
+    'bg-transparent border-2 border-blue-500/60',
+    'bg-transparent border-2 border-amber-500/60',
+    'bg-transparent border-2 border-emerald-500/60',
   ]
 
   return (
@@ -384,20 +384,20 @@ export default function PlayerSession() {
 
       {/* Connection mode indicator */}
       {connectionMode === 'polling' && (
-        <div className="mb-4 p-2 bg-amber-900/20 border border-amber-800/30 rounded-lg text-amber-300/70 text-sm text-center">
+        <div className="mb-4 p-2 bg-transparent border-2 border-amber-500/50 rounded-lg text-amber-300/70 text-sm text-center">
           Corporate network mode
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300/80">
+        <div className="mb-4 p-4 bg-transparent border-2 border-red-500/50 rounded-lg text-red-300/80">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
         </div>
       )}
 
       {challengeMessage && (
-        <div className="mb-4 p-3 bg-white/10 border border-white/20 rounded-lg text-white/80 text-sm">
+        <div className="mb-4 p-3 bg-transparent border-2 border-white/30 rounded-lg text-white/80 text-sm">
           {challengeMessage}
           <button onClick={() => setChallengeMessage(null)} className="ml-2 underline">dismiss</button>
         </div>
@@ -406,7 +406,7 @@ export default function PlayerSession() {
       {/* Lobby State */}
       {session.status === 'lobby' && (
         <div className="flex-1 flex flex-col items-center justify-center animate-slide-up">
-          <div className="animate-pulse-glow w-24 h-24 rounded-full bg-slate-600/30 flex items-center justify-center mb-6">
+          <div className="animate-pulse-glow w-24 h-24 rounded-lg border-2 border-current bg-transparent flex items-center justify-center mb-6">
             <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin"></span>
           </div>
           <h2 className="text-2xl font-bold mb-2">Waiting for host</h2>
@@ -422,13 +422,13 @@ export default function PlayerSession() {
         <div className="flex-1 flex flex-col min-h-0 animate-slide-up">
           {/* Timer expired warning */}
           {session.settings?.timerMode && timerRemaining === 0 && !answerLocked && (
-            <div className="mb-2 p-2 bg-red-900/20 border border-red-800/30 rounded-xl text-red-300/80 text-center animate-pulse text-sm">
+            <div className="mb-2 p-2 bg-transparent border-2 border-red-500/50 rounded-lg text-red-300/80 text-center animate-pulse text-sm">
               Time's up!
             </div>
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-xl p-3 sm:p-4 mb-2 shrink-0">
+          <div className="bg-transparent border-2 border-white/30 rounded-lg p-3 sm:p-4 mb-2 shrink-0">
             <h2 className="text-base sm:text-lg md:text-xl font-bold text-center line-clamp-3">
               {currentQuestion.question}
             </h2>
@@ -493,20 +493,20 @@ export default function PlayerSession() {
             {currentQuestion.options.map((opt, i) => {
               const timerExpired = session.settings?.timerMode && timerRemaining === 0
               const isDisabled = answerLocked || timerExpired
-              
+
               return (
                 <button
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`px-4 py-3 rounded-xl text-left text-base font-medium leading-snug transition-all active:scale-[0.98] flex items-center ${
-                    isDisabled 
-                      ? selectedAnswer === i 
+                  className={`px-4 py-3 rounded-lg text-left text-base font-medium leading-snug transition-all active:scale-[0.98] flex items-center ${
+                    isDisabled
+                      ? selectedAnswer === i
                         ? `${optionColors[i]} opacity-100`
-                        : 'bg-white/5 opacity-50'
+                        : 'bg-transparent border-2 border-white/20 opacity-50'
                       : selectedAnswer === i
-                        ? `${optionColors[i]} ring-2 ring-white/30`
-                        : `${optionColors[i]} opacity-80 hover:opacity-100`
+                        ? `${optionColors[i]} bg-white/10`
+                        : `${optionColors[i]} hover:bg-white/10`
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0 text-lg">{String.fromCharCode(65 + i)}.</span>
@@ -521,16 +521,16 @@ export default function PlayerSession() {
             <button
               onClick={handleConfirmAnswer}
               disabled={selectedAnswer === null}
-              className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-semibold rounded-xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
+              className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-semibold rounded-lg bg-white text-gray-900 border-2 border-white disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0 hover:bg-white/90"
             >
               Lock In Answer
             </button>
           ) : answerLocked ? (
-            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-xl bg-green-500/20 border border-green-500 shrink-0">
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-lg bg-transparent border-2 border-green-500 shrink-0">
               ✓ Answer Locked
             </div>
           ) : (
-            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-xl bg-red-900/20 border border-red-800/30 text-red-300/80 shrink-0">
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-lg bg-transparent border-2 border-red-500/50 text-red-300/80 shrink-0">
               Time Expired
             </div>
           )}
