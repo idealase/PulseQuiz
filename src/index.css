@@ -1,28 +1,30 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --pq-background: #1e1b4b;
-  --pq-surface: #312e81;
-  --pq-text: #f8fafc;
-  --pq-border: #4338ca;
-  --pq-accent: 99 102 241;
-  --pq-accent-2: 34 211 238;
-  --pq-surface-05: rgba(49, 46, 129, 0.05);
-  --pq-surface-10: rgba(49, 46, 129, 0.1);
-  --pq-surface-15: rgba(49, 46, 129, 0.15);
-  --pq-surface-20: rgba(49, 46, 129, 0.2);
-  --pq-border-10: rgba(67, 56, 202, 0.1);
-  --pq-border-20: rgba(67, 56, 202, 0.2);
-  --pq-border-30: rgba(67, 56, 202, 0.3);
-  --pq-text-40: rgba(248, 250, 252, 0.4);
-  --pq-text-50: rgba(248, 250, 252, 0.5);
-  --pq-text-60: rgba(248, 250, 252, 0.6);
-  --pq-text-80: rgba(248, 250, 252, 0.8);
-  --pq-accent-glow-50: rgba(99, 102, 241, 0.5);
-  --pq-accent-glow-80: rgba(99, 102, 241, 0.8);
-  --pq-font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  --pq-background: #0f172a;
+  --pq-surface: #1e293b;
+  --pq-text: #e2e8f0;
+  --pq-border: #334155;
+  --pq-accent: 100 116 139;
+  --pq-accent-2: 148 163 184;
+  --pq-surface-05: rgba(30, 41, 59, 0.05);
+  --pq-surface-10: rgba(30, 41, 59, 0.1);
+  --pq-surface-15: rgba(30, 41, 59, 0.15);
+  --pq-surface-20: rgba(30, 41, 59, 0.2);
+  --pq-border-10: rgba(51, 65, 85, 0.1);
+  --pq-border-20: rgba(51, 65, 85, 0.2);
+  --pq-border-30: rgba(51, 65, 85, 0.3);
+  --pq-text-40: rgba(226, 232, 240, 0.4);
+  --pq-text-50: rgba(226, 232, 240, 0.5);
+  --pq-text-60: rgba(226, 232, 240, 0.6);
+  --pq-text-80: rgba(226, 232, 240, 0.8);
+  --pq-accent-glow-50: rgba(100, 116, 139, 0.35);
+  --pq-accent-glow-80: rgba(100, 116, 139, 0.55);
+  --pq-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
 }
 
 * {
@@ -40,6 +42,9 @@ body {
   background: var(--pq-background);
   color: var(--pq-text);
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.011em;
 }
 
 #root {
@@ -58,41 +63,41 @@ body::before {
 }
 
 body[data-motif='snow']::before {
-  opacity: 0.25;
+  opacity: 0.12;
   background-image:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
-    radial-gradient(circle at 70% 40%, rgba(255, 255, 255, 0.4) 0 2px, transparent 3px),
-    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.3) 0 2px, transparent 3px);
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.3) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 70% 40%, rgba(255, 255, 255, 0.2) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.15) 0 1.5px, transparent 2px);
   background-size: 220px 220px;
 }
 
 body[data-motif='scanlines']::before {
-  opacity: 0.2;
+  opacity: 0.08;
   background: repeating-linear-gradient(
     to bottom,
-    rgba(255, 255, 255, 0.06) 0,
-    rgba(255, 255, 255, 0.06) 1px,
+    rgba(255, 255, 255, 0.04) 0,
+    rgba(255, 255, 255, 0.04) 1px,
     transparent 1px,
     transparent 4px
   );
 }
 
 body[data-motif='confetti']::before {
-  opacity: 0.22;
+  opacity: 0.1;
   background-image:
-    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.6) 0 3px, transparent 4px),
-    radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
-    radial-gradient(circle at 40% 70%, rgba(255, 255, 255, 0.5) 0 2px, transparent 3px),
-    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.4) 0 2px, transparent 3px);
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.3) 0 2px, transparent 3px),
+    radial-gradient(circle at 70% 30%, rgba(255, 255, 255, 0.25) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 40% 70%, rgba(255, 255, 255, 0.25) 0 1.5px, transparent 2px),
+    radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.2) 0 1.5px, transparent 2px);
   background-size: 260px 260px;
 }
 
 body[data-motif='pumpkin']::before {
-  opacity: 0.18;
+  opacity: 0.08;
   background-image:
-    radial-gradient(circle at 20% 30%, rgba(249, 115, 22, 0.4) 0 4px, transparent 5px),
-    radial-gradient(circle at 60% 60%, rgba(249, 115, 22, 0.35) 0 4px, transparent 5px),
-    radial-gradient(circle at 80% 20%, rgba(234, 88, 12, 0.3) 0 4px, transparent 5px);
+    radial-gradient(circle at 20% 30%, rgba(249, 115, 22, 0.2) 0 3px, transparent 4px),
+    radial-gradient(circle at 60% 60%, rgba(249, 115, 22, 0.15) 0 3px, transparent 4px),
+    radial-gradient(circle at 80% 20%, rgba(234, 88, 12, 0.15) 0 3px, transparent 4px);
   background-size: 240px 240px;
 }
 
@@ -109,40 +114,44 @@ input, select, textarea {
 
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
 }
 
 /* Animations */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 20px var(--pq-accent-glow-50); }
-  50% { box-shadow: 0 0 40px var(--pq-accent-glow-80); }
+  0%, 100% { box-shadow: 0 0 12px var(--pq-accent-glow-50); }
+  50% { box-shadow: 0 0 24px var(--pq-accent-glow-80); }
 }
 
 .animate-pulse-glow {
-  animation: pulse-glow 2s ease-in-out infinite;
+  animation: pulse-glow 2.5s ease-in-out infinite;
 }
 
 @keyframes slide-up {
-  from { transform: translateY(20px); opacity: 0; }
+  from { transform: translateY(12px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px) scale(0.97); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-slide-up {
-  animation: slide-up 0.3s ease-out;
+  animation: slide-up 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 :root[data-motion='none'] .animate-pulse-glow,
@@ -156,6 +165,19 @@ input, select, textarea {
 
 :root[data-motion='active'] .animate-slide-up {
   animation-duration: 0.25s;
+}
+
+/* Subtle focus ring */
+*:focus-visible {
+  outline: 2px solid rgba(100, 116, 139, 0.5);
+  outline-offset: 2px;
+}
+
+/* Global transition helpers */
+button, a, input, select, textarea {
+  transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+  transition-duration: 0.2s;
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 @layer utilities {

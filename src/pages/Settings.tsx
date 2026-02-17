@@ -58,13 +58,13 @@ export default function Settings() {
           <span className="text-sm font-medium">Back</span>
         </button>
         <div className="text-center">
-          <h1 className="text-3xl sm:text-4xl font-bold">Settings</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Settings</h1>
           <p className="text-white/60 text-base mt-2">Customize your experience</p>
         </div>
       </div>
 
       <div className="space-y-4">
-        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Experimental Theme Generation</p>
             <p className="text-sm text-white/50">Let AI apply theme tokens for new quizzes</p>
@@ -73,11 +73,11 @@ export default function Settings() {
             type="checkbox"
             checked={experimentalTheme}
             onChange={(e) => setExperimentalTheme(e.target.checked)}
-            className="h-5 w-5 accent-primary"
+            className="h-5 w-5 accent-slate-500"
           />
         </label>
 
-        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Lock Theme</p>
             <p className="text-sm text-white/50">Keep the current theme unless you unlock</p>
@@ -86,11 +86,11 @@ export default function Settings() {
             type="checkbox"
             checked={lockTheme}
             onChange={(e) => setLockTheme(e.target.checked)}
-            className="h-5 w-5 accent-primary"
+            className="h-5 w-5 accent-slate-500"
           />
         </label>
 
-        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Theme Intensity</p>
             <p className="text-sm text-white/50">Subtle or bold styling</p>
@@ -105,7 +105,7 @@ export default function Settings() {
           </select>
         </label>
 
-        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Reduce Motion</p>
             <p className="text-sm text-white/50">Use fewer animations</p>
@@ -114,11 +114,11 @@ export default function Settings() {
             type="checkbox"
             checked={reduceMotion}
             onChange={(e) => setReduceMotion(e.target.checked)}
-            className="h-5 w-5 accent-primary"
+            className="h-5 w-5 accent-slate-500"
           />
         </label>
 
-        <label className="flex items-center justify-between rounded-2xl bg-white/10 border border-white/20 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-white/10 border border-white/20 px-4 py-4">
           <div>
             <p className="font-semibold">Show Hints</p>
             <p className="text-sm text-white/50">Show helper text in menus</p>
@@ -127,20 +127,20 @@ export default function Settings() {
             type="checkbox"
             checked={showHints}
             onChange={(e) => setShowHints(e.target.checked)}
-            className="h-5 w-5 accent-primary"
+            className="h-5 w-5 accent-slate-500"
           />
         </label>
 
-        <label className="flex items-center justify-between rounded-2xl bg-yellow-500/10 border border-yellow-500/30 px-4 py-4">
+        <label className="flex items-center justify-between rounded-xl bg-amber-900/10 border border-amber-800/20 px-4 py-4">
           <div>
-            <p className="font-semibold text-yellow-300">Dev Mode</p>
+            <p className="font-semibold text-amber-300/70">Dev Mode</p>
             <p className="text-sm text-white/50">Show verbose console output in an on-screen overlay</p>
           </div>
           <input
             type="checkbox"
             checked={devMode}
             onChange={(e) => setDevMode(e.target.checked)}
-            className="h-5 w-5 accent-yellow-400"
+            className="h-5 w-5 accent-amber-400"
           />
         </label>
       </div>

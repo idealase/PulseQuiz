@@ -412,21 +412,21 @@ export default function SoloPlay() {
             ← Back
           </Link>
 
-          <h1 className="text-3xl sm:text-4xl font-bold mb-2 bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
-            🎯 Solo Mode
+          <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-white">
+            Solo Mode
           </h1>
           <p className="text-white/60 text-base mb-8">Practice on your own - no pressure!</p>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300">
+            <div className="mb-6 p-4 bg-red-900/20 border border-red-800/30 rounded-xl text-red-300/80">
               {error}
             </div>
           )}
 
           {/* AI Generation Section */}
-          <div className="bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-indigo-500/30 rounded-2xl p-6 mb-6">
+          <div className="bg-white/[0.03] border border-white/10 rounded-xl p-6 mb-6">
             <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <span className="text-2xl">🤖</span> AI Quiz Generator
+              AI Quiz Generator
             </h2>
             
             <div className="space-y-4">
@@ -437,7 +437,7 @@ export default function SoloPlay() {
                   value={aiTopics}
                   onChange={(e) => setAiTopics(e.target.value)}
                   placeholder="e.g., Space exploration, Ancient Rome, 90s movies"
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-slate-500"
                   disabled={aiGenerating}
                 />
               </div>
@@ -466,7 +466,7 @@ export default function SoloPlay() {
                     className="w-5 h-5 rounded"
                     disabled={aiGenerating}
                   />
-                  <span className="text-sm">🔬 Research Mode</span>
+                  <span className="text-sm">Research Mode</span>
                 </label>
               </div>
 
@@ -478,7 +478,7 @@ export default function SoloPlay() {
                   className="w-5 h-5 rounded"
                   disabled={aiGenerating}
                 />
-                <span className="text-sm">🎲 Dynamic Mode (adapts difficulty)</span>
+                <span className="text-sm">Dynamic Mode (adapts difficulty)</span>
               </label>
 
               <div>
@@ -493,30 +493,30 @@ export default function SoloPlay() {
                   value={aiAuthToken}
                   onChange={(e) => setAiAuthToken(e.target.value)}
                   placeholder="Enter auth token"
-                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-indigo-500"
+                  className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:outline-none focus:border-slate-500"
                 />
               </div>
 
               <button
                 onClick={handleAiGenerate}
                 disabled={aiGenerating || !aiTopics.trim()}
-                className="w-full py-3 px-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-xl font-bold hover:from-indigo-600 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 px-6 bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {aiGenerating ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin">⚡</span> Generating...
+                    <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin"></span> Generating...
                   </span>
                 ) : (
-                  '✨ Generate Quiz'
+                  'Generate Quiz'
                 )}
               </button>
 
               <button
                 onClick={handleThemePreview}
                 disabled={themeGenerating || !aiTopics.trim() || lockTheme || !experimentalTheme}
-                className="w-full py-2.5 px-6 border border-indigo-500/50 rounded-xl font-semibold text-indigo-200 hover:bg-indigo-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-2.5 px-6 border border-slate-500/40 rounded-xl font-semibold text-white/60 hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}
+                {themeGenerating ? 'Previewing Theme...' : 'Preview Theme'}
               </button>
 
               {generationTime && (
@@ -530,7 +530,7 @@ export default function SoloPlay() {
           {/* Preset Questions */}
           <details className="mb-6">
             <summary className="cursor-pointer text-white/60 hover:text-white mb-4">
-              📚 Or use preset questions...
+              Or use preset questions...
             </summary>
             <div className="grid grid-cols-2 gap-3 mt-4">
               {questionSets.map((set) => (
@@ -539,8 +539,7 @@ export default function SoloPlay() {
                   onClick={() => handlePresetSelect(set.id, 10)}
                   className="p-4 bg-white/10 hover:bg-white/20 rounded-xl text-left transition-all"
                 >
-                  <span className="text-2xl">{set.emoji}</span>
-                  <div className="font-medium mt-1">{set.name}</div>
+                  <div className="font-medium">{set.name}</div>
                   <div className="text-sm text-white/50">{set.questions.length} questions</div>
                 </button>
               ))}
@@ -550,10 +549,10 @@ export default function SoloPlay() {
           {/* CSV Upload */}
           <details className="mb-6">
             <summary className="cursor-pointer text-white/60 hover:text-white">
-              📄 Or upload CSV...
+              Or upload CSV...
             </summary>
             <div
-              className={`mt-4 border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+              className={`mt-4 border border-dashed rounded-xl p-8 text-center transition-all ${
                 dragActive ? 'border-primary bg-primary/10' : 'border-white/30 hover:border-white/50'
               }`}
               onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
@@ -568,16 +567,15 @@ export default function SoloPlay() {
                 id="csv-upload"
               />
               <label htmlFor="csv-upload" className="cursor-pointer">
-                <div className="text-4xl mb-2">📄</div>
                 <p className="text-white/80">Drop CSV here or click to browse</p>
               </label>
             </div>
           </details>
 
           {csvErrors.length > 0 && (
-            <div className="mb-6 p-4 bg-yellow-500/20 border border-yellow-500/50 rounded-xl">
-              <p className="font-medium text-yellow-300 mb-2">⚠️ CSV Warnings:</p>
-              <ul className="text-sm text-yellow-200/80 list-disc list-inside">
+            <div className="mb-6 p-4 bg-amber-900/20 border border-amber-800/30 rounded-xl">
+              <p className="font-medium text-amber-300/70 mb-2">CSV Warnings:</p>
+              <ul className="text-sm text-amber-200/70 list-disc list-inside">
                 {csvErrors.map((err, i) => <li key={i}>{err}</li>)}
               </ul>
             </div>
@@ -585,9 +583,9 @@ export default function SoloPlay() {
 
           {/* Questions Preview */}
           {questions.length > 0 && (
-            <div className="mb-6 p-4 bg-green-500/20 border border-green-500/50 rounded-xl">
-              <p className="font-medium text-green-300">
-                ✅ {questions.length} questions loaded!
+            <div className="mb-6 p-4 bg-teal-900/20 border border-teal-800/30 rounded-xl">
+              <p className="font-medium text-teal-300/70">
+                {questions.length} questions loaded
               </p>
             </div>
           )}
@@ -601,7 +599,7 @@ export default function SoloPlay() {
                 onChange={(e) => setTimerEnabled(e.target.checked)}
                 className="w-5 h-5 rounded"
               />
-              <span>⏱️ Enable Timer</span>
+              <span>Enable Timer</span>
               {timerEnabled && (
                 <input
                   type="number"
@@ -620,17 +618,17 @@ export default function SoloPlay() {
           <button
             onClick={startGame}
             disabled={questions.length === 0 || generationActive}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95"
+            className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-slate-700/60 border border-slate-600/40 hover:bg-slate-700/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
-            {generationActive ? 'Preparing...' : '🎮 Start Solo Quiz!'}
+            {generationActive ? 'Preparing...' : 'Start Solo Quiz'}
           </button>
         </div>
         </div>
 
         {generationActive && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-            <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
-              <div className="text-3xl mb-3">⏳</div>
+            <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-900/90 p-6 text-center">
+              <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/60 animate-spin mb-3 mx-auto"></div>
               <h3 className="text-lg font-bold">Preparing your quiz</h3>
               <p className="text-white/60 text-sm mt-1">
                 {aiGenerating && themeGenerating
@@ -662,16 +660,16 @@ export default function SoloPlay() {
           <div className="flex items-center gap-4">
             {dynamicConfig && (
               <div className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs font-bold">
-                🎲 Dynamic {questions.length}/{dynamicConfig.targetCount}
+                Dynamic {questions.length}/{dynamicConfig.targetCount}
                 {generatingBatch && <span className="ml-1 animate-pulse">• Generating</span>}
               </div>
             )}
             {streak > 1 && (
-              <div className="px-3 py-1 bg-orange-500/20 text-orange-400 rounded-full text-sm font-bold">
-                🔥 {streak} streak!
+              <div className="px-3 py-1 bg-orange-500/20 text-amber-300/70 rounded-full text-sm font-bold">
+                {streak} streak
               </div>
             )}
-            <div className="text-xl font-bold text-yellow-400">
+            <div className="text-xl font-bold text-amber-300/70">
               {score} pts
             </div>
           </div>
@@ -683,7 +681,7 @@ export default function SoloPlay() {
             <div className="h-2 bg-white/10 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-1000 ${
-                  timeRemaining <= 5 ? 'bg-red-500' : 'bg-green-500'
+                  timeRemaining <= 5 ? 'bg-red-400/60' : 'bg-teal-500/60'
                 }`}
                 style={{ width: `${(timeRemaining / timerSeconds) * 100}%` }}
               />
@@ -696,7 +694,7 @@ export default function SoloPlay() {
 
         {/* Question */}
         <div className="flex-1 flex flex-col min-h-0 max-w-2xl mx-auto w-full">
-          <div className="bg-white/10 backdrop-blur-lg rounded-2xl p-4 md:p-6 mb-3 shrink-0">
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-4 md:p-6 mb-3 shrink-0">
             <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-center">
               {currentQuestion.question}
             </h2>
@@ -722,8 +720,8 @@ export default function SoloPlay() {
                   key={index}
                   onClick={() => !showResult && handleAnswer(index)}
                   disabled={showResult}
-                  className={`px-4 py-3 md:py-4 rounded-2xl border-2 text-left transition-all flex items-center ${bgClass} ${
-                    !showResult ? 'hover:scale-102 active:scale-98' : ''
+                  className={`px-4 py-3 md:py-4 rounded-xl border text-left transition-all flex items-center ${bgClass} ${
+                    !showResult ? 'active:scale-[0.98]' : ''
                   }`}
                 >
                   <span className="text-base sm:text-lg line-clamp-2">{option}</span>
@@ -737,15 +735,15 @@ export default function SoloPlay() {
             <div className="mt-3 text-center animate-slide-up shrink-0">
               {selectedAnswer === currentQuestion.correct ? (
                 <div className="text-green-400 text-xl font-bold mb-1">
-                  ✅ Correct! +{currentQuestion.points}{streak > 1 ? ` +${Math.min(streak - 1, 5) * 50} streak bonus` : ''}
+                  Correct! +{currentQuestion.points}{streak > 1 ? ` +${Math.min(streak - 1, 5) * 50} streak bonus` : ''}
                 </div>
               ) : selectedAnswer === -1 ? (
                 <div className="text-red-400 text-xl font-bold mb-1">
-                  ⏱️ Time's up!
+                  Time's up!
                 </div>
               ) : (
                 <div className="text-red-400 text-xl font-bold mb-1">
-                  ❌ Incorrect
+                  Incorrect
                 </div>
               )}
               
@@ -756,7 +754,7 @@ export default function SoloPlay() {
               <button
                 onClick={nextQuestion}
                 disabled={shouldBlockForBatch}
-                className="px-8 py-3 bg-gradient-to-r from-primary to-indigo-500 rounded-xl font-bold hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                className="px-8 py-3 bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 rounded-xl font-semibold active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {shouldBlockForBatch
                   ? 'Generating next batch...'
@@ -776,22 +774,19 @@ export default function SoloPlay() {
     const maxPossibleScore = questions.reduce((sum, q) => sum + q.points, 0)
     const scorePercent = Math.round((score / maxPossibleScore) * 100)
     
-    let grade = '🌟'
-    let message = 'Amazing!'
-    if (scorePercent < 30) { grade = '😅'; message = 'Keep practicing!' }
-    else if (scorePercent < 50) { grade = '🙂'; message = 'Not bad!' }
-    else if (scorePercent < 70) { grade = '😊'; message = 'Good job!' }
-    else if (scorePercent < 90) { grade = '🎉'; message = 'Great work!' }
-    else { grade = '🏆'; message = 'Outstanding!' }
+    let message = 'Outstanding!'
+    if (scorePercent < 30) { message = 'Keep practicing' }
+    else if (scorePercent < 50) { message = 'Not bad' }
+    else if (scorePercent < 70) { message = 'Good job' }
+    else if (scorePercent < 90) { message = 'Great work' }
 
     return (
       <div className="h-[100dvh] px-5 py-3 sm:p-6 flex items-center justify-center overflow-y-auto">
         <div className="max-w-md w-full text-center">
-          <div className="text-8xl mb-4">{grade}</div>
           <h1 className="text-4xl font-bold mb-2">{message}</h1>
           
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl p-8 my-8">
-            <div className="text-5xl font-black text-yellow-400 mb-2">
+            <div className="text-5xl font-black text-amber-300/70 mb-2">
               {score}
             </div>
             <div className="text-white/60 mb-6">points</div>
@@ -806,7 +801,7 @@ export default function SoloPlay() {
                 <div className="text-sm text-white/50">Accuracy</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-orange-400">{bestStreak}</div>
+                <div className="text-2xl font-bold text-amber-300/70">{bestStreak}</div>
                 <div className="text-sm text-white/50">Best Streak</div>
               </div>
             </div>
@@ -815,7 +810,7 @@ export default function SoloPlay() {
           {/* Question Review */}
           <details className="mb-6 text-left">
             <summary className="cursor-pointer text-white/60 hover:text-white text-center">
-              📋 Review Answers
+              Review Answers
             </summary>
             <div className="mt-4 space-y-3">
               {answers.map((answer, i) => {
@@ -843,23 +838,23 @@ export default function SoloPlay() {
           <div className="flex flex-col gap-3">
             <button
               onClick={playAgain}
-              className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-400 hover:to-orange-400 transition-all hover:scale-105 active:scale-95"
+              className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-slate-700/60 border border-slate-600/40 hover:bg-slate-700/80 transition-all active:scale-[0.98]"
             >
-              🔄 Play Again
+              Play Again
             </button>
             
             <button
               onClick={restartGame}
-              className="w-full py-3 px-8 font-medium rounded-2xl bg-white/10 hover:bg-white/20 transition-all"
+              className="w-full py-3 px-8 font-medium rounded-xl bg-white/10 hover:bg-white/20 transition-all"
             >
-              📝 New Quiz
+              New Quiz
             </button>
             
             <Link
               to="/"
-              className="w-full py-3 px-8 font-medium rounded-2xl border border-white/30 hover:bg-white/10 transition-all text-center"
+              className="w-full py-3 px-8 font-medium rounded-xl border border-white/30 hover:bg-white/10 transition-all text-center"
             >
-              🏠 Home
+              Home
             </Link>
           </div>
         </div>

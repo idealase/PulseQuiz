@@ -11,13 +11,15 @@ export default function GlobalNav() {
         <Link
           to="/"
           aria-label="Home menu"
-          className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-semibold shadow-lg transition-all ${
+          className={`inline-flex items-center gap-1.5 sm:gap-2 rounded-full border px-3 py-1.5 sm:px-4 sm:py-2 text-sm font-semibold shadow-sm transition-all ${
             isHome
-              ? 'bg-white/15 border-white/20 text-white/80'
-              : 'bg-white/10 border-white/30 text-white/90 hover:bg-white/20'
+              ? 'bg-white/15 border-white/10 text-white/80'
+              : 'bg-white/10 border-white/20 text-white/90 hover:bg-white/20'
           }`}
         >
-          <span className="text-base sm:text-lg">🏠</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
+          </svg>
           <span className="hidden sm:inline">Menu</span>
         </Link>
       </div>
@@ -27,10 +29,10 @@ export default function GlobalNav() {
           to="/settings"
           state={{ from: location.pathname }}
           aria-label="Settings"
-          className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-lg transition-all ${
+          className={`inline-flex items-center justify-center w-9 h-9 sm:w-10 sm:h-10 rounded-full border shadow-sm transition-all ${
             isSettings
-              ? 'bg-white/20 border-white/30 text-white'
-              : 'bg-white/10 border-white/20 text-white/70 hover:bg-white/20 hover:text-white'
+              ? 'bg-white/20 border-white/20 text-white'
+              : 'bg-white/10 border-white/10 text-white/70 hover:bg-white/20 hover:text-white'
           }`}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">

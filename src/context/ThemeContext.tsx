@@ -2,14 +2,14 @@ import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, 
 import type { ThemeIntensity, ThemeSpec } from '../types'
 
 const DEFAULT_THEME: ThemeSpec = {
-  themeId: 'aurora',
+  themeId: 'slate',
   palette: {
-    background: '#1e1b4b',
-    surface: '#312e81',
-    text: '#f8fafc',
-    accent: '#6366f1',
-    accent2: '#22d3ee',
-    border: '#4338ca'
+    background: '#0f172a',
+    surface: '#1e293b',
+    text: '#e2e8f0',
+    accent: '#64748b',
+    accent2: '#94a3b8',
+    border: '#334155'
   },
   typography: {
     fontFamily: 'system',

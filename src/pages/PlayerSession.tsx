@@ -338,10 +338,10 @@ export default function PlayerSession() {
 
   // Option colors for visual variety
   const optionColors = [
-    'from-red-500 to-red-600',
-    'from-blue-500 to-blue-600',
-    'from-yellow-500 to-yellow-600',
-    'from-green-500 to-green-600',
+    'bg-red-900/40',
+    'bg-blue-900/40',
+    'bg-amber-900/40',
+    'bg-emerald-900/40',
   ]
 
   return (
@@ -353,8 +353,8 @@ export default function PlayerSession() {
           <p className="font-bold">{nickname}</p>
           {/* Show current rank during play */}
           {session.status === 'playing' && myRank !== null && (
-            <p className="text-sm text-secondary">
-              {myRank === 1 ? '🥇' : myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '📊'} {getOrdinal(myRank)} place
+            <p className="text-sm text-white/70">
+              {getOrdinal(myRank)} place
             </p>
           )}
         </div>
@@ -362,8 +362,8 @@ export default function PlayerSession() {
           {/* Timer */}
           {session.status === 'playing' && session.settings?.timerMode && timerRemaining !== null && (
             <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
-              timerRemaining <= 5 ? 'bg-red-500/30 text-red-300 animate-pulse' :
-              timerRemaining <= 10 ? 'bg-yellow-500/30 text-yellow-300' :
+              timerRemaining <= 5 ? 'bg-red-900/30 text-red-300/80 animate-pulse' :
+              timerRemaining <= 10 ? 'bg-amber-900/30 text-amber-300/70' :
               'bg-white/10'
             }`}>
               {timerRemaining}
@@ -380,13 +380,13 @@ export default function PlayerSession() {
 
       {/* Connection mode indicator */}
       {connectionMode === 'polling' && (
-        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
-          📡 Corporate network mode
+        <div className="mb-4 p-2 bg-amber-900/20 border border-amber-800/30 rounded-lg text-amber-300/70 text-sm text-center">
+          Corporate network mode
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+        <div className="mb-4 p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300/80">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
         </div>
@@ -402,8 +402,8 @@ export default function PlayerSession() {
       {/* Lobby State */}
       {session.status === 'lobby' && (
         <div className="flex-1 flex flex-col items-center justify-center animate-slide-up">
-          <div className="animate-pulse-glow w-24 h-24 rounded-full bg-primary/30 flex items-center justify-center mb-6">
-            <span className="text-4xl">⏳</span>
+          <div className="animate-pulse-glow w-24 h-24 rounded-full bg-slate-600/30 flex items-center justify-center mb-6">
+            <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin"></span>
           </div>
           <h2 className="text-2xl font-bold mb-2">Waiting for host</h2>
           <p className="text-white/60">Get ready!</p>
@@ -418,13 +418,13 @@ export default function PlayerSession() {
         <div className="flex-1 flex flex-col min-h-0 animate-slide-up">
           {/* Timer expired warning */}
           {session.settings?.timerMode && timerRemaining === 0 && !answerLocked && (
-            <div className="mb-2 p-2 bg-red-500/20 border border-red-500/50 rounded-xl text-red-300 text-center animate-pulse text-sm">
-              ⏰ Time's up!
+            <div className="mb-2 p-2 bg-red-900/20 border border-red-800/30 rounded-xl text-red-300/80 text-center animate-pulse text-sm">
+              Time's up!
             </div>
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-2xl p-3 sm:p-4 mb-2 shrink-0">
+          <div className="bg-white/10 rounded-xl p-3 sm:p-4 mb-2 shrink-0">
             <h2 className="text-base sm:text-lg md:text-xl font-bold text-center line-clamp-3">
               {currentQuestion.question}
             </h2>
@@ -440,8 +440,7 @@ export default function PlayerSession() {
             </button>
             {/* Live challenge badge — shows when other players have challenged this question */}
             {challengeBadges[session.currentQuestionIndex] && challengeBadges[session.currentQuestionIndex].count > 0 && (
-              <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg bg-orange-500/15 border border-orange-400/30 text-orange-300 animate-[fadeIn_0.5s_ease-in-out]">
-                <span>🚩</span>
+              <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-lg bg-amber-900/15 border border-amber-700/30 text-orange-300 animate-[fadeIn_0.5s_ease-in-out]">
                 <span>{challengeBadges[session.currentQuestionIndex].count} challenged</span>
               </div>
             )}
@@ -496,14 +495,14 @@ export default function PlayerSession() {
                   key={i}
                   onClick={() => handleSelectAnswer(i)}
                   disabled={isDisabled}
-                  className={`px-4 py-3 rounded-xl text-left text-base font-medium leading-snug transition-all active:scale-98 flex items-center ${
+                  className={`px-4 py-3 rounded-xl text-left text-base font-medium leading-snug transition-all active:scale-[0.98] flex items-center ${
                     isDisabled 
                       ? selectedAnswer === i 
-                        ? `bg-gradient-to-r ${optionColors[i]} opacity-100`
+                        ? `${optionColors[i]} opacity-100`
                         : 'bg-white/5 opacity-50'
                       : selectedAnswer === i
-                        ? `bg-gradient-to-r ${optionColors[i]} ring-4 ring-white/50`
-                        : `bg-gradient-to-r ${optionColors[i]} opacity-80 hover:opacity-100`
+                        ? `${optionColors[i]} ring-2 ring-white/30`
+                        : `${optionColors[i]} opacity-80 hover:opacity-100`
                   }`}
                 >
                   <span className="font-bold mr-2 shrink-0 text-lg">{String.fromCharCode(65 + i)}.</span>
@@ -518,17 +517,17 @@ export default function PlayerSession() {
             <button
               onClick={handleConfirmAnswer}
               disabled={selectedAnswer === null}
-              className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold rounded-2xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
+              className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-semibold rounded-xl bg-white text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-all shrink-0"
             >
               Lock In Answer
             </button>
           ) : answerLocked ? (
-            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-2xl bg-green-500/20 border-2 border-green-500 shrink-0">
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-xl bg-green-500/20 border border-green-500 shrink-0">
               ✓ Answer Locked
             </div>
           ) : (
-            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-2xl bg-red-500/20 border-2 border-red-500/50 text-red-300 shrink-0">
-              ⏰ Time Expired
+            <div className="mt-3 py-3 sm:py-3.5 text-lg sm:text-xl font-bold text-center rounded-xl bg-red-900/20 border border-red-800/30 text-red-300/80 shrink-0">
+              Time Expired
             </div>
           )}
         </div>
@@ -539,23 +538,23 @@ export default function PlayerSession() {
         <div className="flex-1 animate-slide-up overflow-y-auto min-h-0">
           {/* My Score */}
           {myScore && (
-            <div className="bg-gradient-to-r from-primary to-secondary rounded-2xl p-6 text-center mb-6">
+            <div className="bg-slate-700/60 border border-slate-600/40 rounded-xl p-6 text-center mb-6">
               <p className="text-white/80 mb-1">Your Score</p>
               <p className="text-5xl font-black">{myScore.score}</p>
               <p className="mt-2 text-xl">
-                {myScore.rank === 1 ? '🥇 1st Place!' :
-                 myScore.rank === 2 ? '🥈 2nd Place!' :
-                 myScore.rank === 3 ? '🥉 3rd Place!' :
+                {myScore.rank === 1 ? '1st Place!' :
+                 myScore.rank === 2 ? '2nd Place!' :
+                 myScore.rank === 3 ? '3rd Place!' :
                  `${myScore.rank}th Place`}
               </p>
               <p className="text-white/60 text-sm mt-1">
-                Total time: {myScore.totalTime.toFixed(1)}s ⚡
+                Total time: {myScore.totalTime.toFixed(1)}s
               </p>
             </div>
           )}
 
           {/* Leaderboard */}
-          <div className="bg-white/10 rounded-2xl overflow-hidden mb-6">
+          <div className="bg-white/10 rounded-xl overflow-hidden mb-6">
             <h3 className="p-4 font-bold border-b border-white/10">Leaderboard</h3>
             {results.players.slice(0, 5).map((p, i) => (
               <div 
@@ -565,9 +564,9 @@ export default function PlayerSession() {
                 }`}
               >
                 <span className={`w-8 h-8 rounded-full flex items-center justify-center font-bold mr-3 text-sm ${
-                  i === 0 ? 'bg-yellow-500 text-black' :
-                  i === 1 ? 'bg-gray-300 text-black' :
-                  i === 2 ? 'bg-amber-700 text-white' :
+                  i === 0 ? 'bg-amber-700/60 text-amber-100' :
+                  i === 1 ? 'bg-slate-500/50 text-slate-200' :
+                  i === 2 ? 'bg-amber-800/40 text-amber-200' :
                   'bg-white/20'
                 }`}>
                   {p.rank}
@@ -581,22 +580,22 @@ export default function PlayerSession() {
             ))}
           </div>
           <p className="text-center text-white/40 text-xs mb-4">
-            Ties broken by fastest total answer time ⚡
+            Ties broken by fastest total answer time
           </p>
 
           {/* Post-Game Actions */}
           <div className="flex gap-3 mb-6">
             <Link
               to="/join"
-              className="flex-1 py-3 text-center font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all"
+              className="flex-1 py-3 text-center font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all"
             >
-              🎮 Join New Game
+              Join New Game
             </Link>
             <Link
               to="/"
-              className="flex-1 py-3 text-center font-bold rounded-2xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
+              className="flex-1 py-3 text-center font-semibold rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
             >
-              🏠 Home
+              Home
             </Link>
           </div>
 
@@ -635,7 +634,7 @@ export default function PlayerSession() {
                 </div>
                 {q.explanation && (
                   <p className="text-white/60 text-sm mt-2 italic">
-                    💡 {q.explanation}
+                    {q.explanation}
                   </p>
                 )}
 
@@ -648,14 +647,14 @@ export default function PlayerSession() {
                   const statusLabel = status.replace(/_/g, ' ')
                   const isUnderReview = status === 'under_review'
                   const isResolved = status === 'resolved'
-                  const badgeBg = isResolved ? 'bg-green-500/15 border-green-400/30' : isUnderReview ? 'bg-yellow-500/15 border-yellow-400/30' : 'bg-orange-500/15 border-orange-400/30'
-                  const badgeIcon = isResolved ? '✅' : isUnderReview ? '⚖️' : '🚩'
+                  const badgeBg = isResolved ? 'bg-green-500/15 border-green-400/30' : isUnderReview ? 'bg-amber-900/15 border-amber-700/30' : 'bg-amber-900/15 border-amber-700/30'
+                  const badgeIcon = isResolved ? '✅' : ''
 
                   return (
                     <div className={`mt-3 rounded-xl border p-3 ${badgeBg} animate-[fadeIn_0.5s_ease-in-out]`}>
                       {/* Badge header */}
                       <div className="flex items-center gap-2">
-                        <span className="text-lg">{badgeIcon}</span>
+                        {badgeIcon && <span className="text-lg">{badgeIcon}</span>}
                         <span className="font-bold text-sm uppercase tracking-wide text-white/90">
                           Challenge {statusLabel}
                         </span>
@@ -696,7 +695,6 @@ export default function PlayerSession() {
                       {q.aiVerdict && (
                         <div className="mt-3 pt-3 border-t border-white/10 pl-7">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-base">🤖</span>
                             <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">AI Verification</span>
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                               q.aiVerdict === 'valid' ? 'bg-green-500/25 text-green-200' : 'bg-red-500/25 text-red-200'
@@ -714,7 +712,6 @@ export default function PlayerSession() {
                       {q.scoringPolicy && (
                         <div className="mt-3 pt-3 border-t border-white/10 pl-7">
                           <div className="flex items-center gap-2">
-                            <span className="text-base">📊</span>
                             <span className="text-xs font-semibold text-white/90 uppercase tracking-wide">Scoring</span>
                             <span className="text-xs text-white/70">{q.scoringPolicy}</span>
                             {q.acceptedAnswers && q.acceptedAnswers.length > 0 && (
@@ -729,7 +726,7 @@ export default function PlayerSession() {
                         onClick={() => openThread(i)}
                         className="mt-3 w-full text-xs py-2 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all flex items-center justify-center gap-1.5"
                       >
-                        💬 View Discussion Thread
+                        View Discussion Thread
                       </button>
                     </div>
                   )
@@ -764,7 +761,7 @@ export default function PlayerSession() {
                       onClick={() => openThread(i)}
                       className="text-xs px-3 py-1.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20"
                     >
-                      💬 {challengeBadges[i].count} discussion{challengeBadges[i].count !== 1 ? 's' : ''}
+                      {challengeBadges[i].count} discussion{challengeBadges[i].count !== 1 ? 's' : ''}
                     </button>
                   )}
                 </div>
@@ -816,7 +813,7 @@ export default function PlayerSession() {
       {/* Challenge Thread Modal */}
       {threadOpen !== null && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-gray-900 border border-white/20 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
+          <div className="bg-gray-900 border border-white/20 rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
             {/* Thread header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
               <div>
@@ -847,7 +844,6 @@ export default function PlayerSession() {
                 <div key={idx} className="rounded-xl bg-white/5 border border-white/10 p-3">
                   {/* Challenge submission */}
                   <div className="flex items-start gap-2">
-                    <span className="text-lg shrink-0 mt-0.5">🚩</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-white/90">{entry.nickname}</span>
@@ -875,7 +871,7 @@ export default function PlayerSession() {
                               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
                           }`}
                         >
-                          👍 Agree
+                          Agree
                         </button>
                         <button
                           onClick={() => handleVote(threadOpen, entry.playerId, entry.myVote === -1 ? 0 : -1)}
@@ -885,7 +881,7 @@ export default function PlayerSession() {
                               : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10'
                           }`}
                         >
-                          👎 Disagree
+                          Disagree
                         </button>
                         <span className={`text-xs font-medium ${
                           entry.voteScore > 0 ? 'text-green-400' : entry.voteScore < 0 ? 'text-red-400' : 'text-white/40'
@@ -925,7 +921,6 @@ export default function PlayerSession() {
                     : 'bg-amber-500/10 border-amber-400/30'
                 }`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg">🤖</span>
                     <span className="font-bold text-xs text-white/90 uppercase tracking-wide">AI Verification</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                       threadData.aiVerification.verdict === 'valid'
@@ -950,7 +945,6 @@ export default function PlayerSession() {
               {!threadLoading && threadData?.resolution && (
                 <div className="rounded-xl bg-green-500/10 border border-green-400/30 p-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">⚖️</span>
                     <span className="font-bold text-sm text-green-300 uppercase">
                       Resolution: {threadData.resolution.verdict || threadData.resolution.status.replace(/_/g, ' ')}
                     </span>
@@ -976,7 +970,7 @@ export default function PlayerSession() {
                 <button
                   onClick={submitReply}
                   disabled={!replyText.trim() || replySubmitting}
-                  className="px-4 py-2 rounded-lg bg-primary/80 hover:bg-primary text-sm font-medium disabled:opacity-40 transition-all shrink-0"
+                  className="px-4 py-2 rounded-lg bg-slate-600/60 hover:bg-slate-600/80 text-sm font-medium disabled:opacity-40 transition-all shrink-0"
                 >
                   {replySubmitting ? '...' : 'Send'}
                 </button>

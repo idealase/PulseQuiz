@@ -129,10 +129,10 @@ export default function AudienceSession() {
 
   // Option colors matching player view
   const optionColors = [
-    'bg-red-500',
-    'bg-blue-500',
-    'bg-yellow-500',
-    'bg-green-500',
+    'bg-red-400/50',
+    'bg-blue-400/50',
+    'bg-amber-400/50',
+    'bg-emerald-400/50',
   ]
 
   // Calculate percentage for stats bars
@@ -146,13 +146,13 @@ export default function AudienceSession() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
+          <h1 className="text-2xl font-bold font-mono text-white/70">{code}</h1>
         </div>
         <div className="flex items-center gap-4">
           {session.status === 'playing' && session.settings?.timerMode && timerRemaining !== null && (
             <div className={`w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl ${
-              timerRemaining <= 5 ? 'bg-red-500/30 text-red-300 animate-pulse' :
-              timerRemaining <= 10 ? 'bg-yellow-500/30 text-yellow-300' :
+              timerRemaining <= 5 ? 'bg-red-900/30 text-red-300/80 animate-pulse' :
+              timerRemaining <= 10 ? 'bg-amber-900/30 text-amber-300/70' :
               'bg-white/10'
             }`}>
               {timerRemaining}
@@ -175,23 +175,23 @@ export default function AudienceSession() {
           }}
           className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
             hideStats 
-              ? 'bg-orange-500/20 border border-orange-500/50 text-orange-300' 
+              ? 'bg-amber-900/20 border border-amber-800/30 text-amber-300/70' 
               : 'bg-white/10 border border-white/20 text-white/60 hover:bg-white/20'
           }`}
         >
-          {hideStats ? '🙈 Stats Hidden' : '👁️ Showing Stats'}
+          {hideStats ? 'Stats Hidden' : 'Showing Stats'}
         </button>
       </div>
 
       {/* Connection mode indicator */}
       {connectionMode === 'polling' && (
-        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
-          📡 Corporate network mode
+        <div className="mb-4 p-2 bg-amber-900/20 border border-amber-800/30 rounded-lg text-amber-300/70 text-sm text-center">
+          Corporate network mode
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+        <div className="mb-4 p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300/80">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
         </div>
@@ -202,10 +202,8 @@ export default function AudienceSession() {
         <div className="space-y-4">
           {/* Lobby State */}
           {session.status === 'lobby' && (
-            <div className="bg-white/10 rounded-2xl p-8 text-center animate-slide-up">
-              <div className="animate-pulse-glow w-20 h-20 rounded-full bg-primary/30 flex items-center justify-center mb-4 mx-auto">
-                <span className="text-3xl">⏳</span>
-              </div>
+            <div className="bg-white/10 rounded-xl p-8 text-center animate-slide-up">
+              <div className="w-16 h-16 rounded-full border-2 border-white/15 border-t-white/50 animate-spin mb-4 mx-auto"></div>
               <h2 className="text-2xl font-bold mb-2">Waiting to Start</h2>
               <p className="text-white/60">
                 {session.players.length} player{session.players.length !== 1 ? 's' : ''} joined
@@ -223,7 +221,7 @@ export default function AudienceSession() {
               <div className="flex items-center gap-4">
                 <div className="flex-1 h-3 bg-white/20 rounded-full overflow-hidden">
                   <div 
-                    className="h-full bg-primary transition-all duration-300"
+                    className="h-full bg-slate-500/60 transition-all duration-300"
                     style={{ width: `${((session.currentQuestionIndex + 1) / session.questions.length) * 100}%` }}
                   />
                 </div>
@@ -233,7 +231,7 @@ export default function AudienceSession() {
               </div>
 
               {/* Question */}
-              <div className="bg-white/10 rounded-2xl p-6">
+              <div className="bg-white/10 rounded-xl p-6">
                 <h2 className="text-xl md:text-2xl font-bold text-center">
                   {currentQuestion.question}
                 </h2>
@@ -241,9 +239,9 @@ export default function AudienceSession() {
 
               {/* Live Answer Statistics */}
               {!hideStats ? (
-                <div className="bg-white/5 rounded-2xl p-6">
+                <div className="bg-white/5 rounded-xl p-6">
                   <h3 className="font-bold mb-4 flex items-center justify-between">
-                    <span>📊 Live Responses</span>
+                    <span>Live Responses</span>
                     <span className="text-sm font-normal text-white/60">
                       {questionStats?.answeredCount || 0} / {session.players.length} answered
                     </span>
@@ -280,8 +278,7 @@ export default function AudienceSession() {
                   </div>
                 </div>
               ) : (
-                <div className="bg-white/5 rounded-2xl p-6 text-center">
-                  <div className="text-4xl mb-3">🙈</div>
+                <div className="bg-white/5 rounded-xl p-6 text-center">
                   <p className="text-white/60">Stats hidden to prevent peeking</p>
                   <p className="text-sm text-white/40 mt-1">
                     {questionStats?.answeredCount || 0} / {session.players.length} answered
@@ -294,21 +291,20 @@ export default function AudienceSession() {
           {/* Revealed State - Final Results */}
           {session.status === 'revealed' && results && (
             <div className="space-y-4 animate-slide-up">
-              <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl p-6 text-center">
-                <h2 className="text-3xl font-black">🏆 Final Results</h2>
+              <div className="bg-slate-700/60 border border-slate-600/40 rounded-xl p-6 text-center">
+                <h2 className="text-3xl font-bold">Final Results</h2>
               </div>
 
               {/* Top 3 Podium */}
               {results.players.length >= 1 && (
-                <div className="bg-white/10 rounded-2xl p-6">
+                <div className="bg-white/10 rounded-xl p-6">
                   <div className="flex items-end justify-center gap-4 h-40">
                     {/* 2nd Place */}
                     {results.players[1] && (
                       <div className="flex flex-col items-center">
-                        <span className="text-2xl mb-2">🥈</span>
                         <div className="w-20 bg-gray-300/20 rounded-t-lg flex flex-col items-center justify-end pb-2" style={{ height: '80px' }}>
                           <p className="font-bold text-sm truncate max-w-full px-1">{results.players[1].nickname}</p>
-                          <p className="text-lg font-black text-secondary">{results.players[1].score}</p>
+                          <p className="text-lg font-bold text-white/70">{results.players[1].score}</p>
                         </div>
                       </div>
                     )}
@@ -316,10 +312,9 @@ export default function AudienceSession() {
                     {/* 1st Place */}
                     {results.players[0] && (
                       <div className="flex flex-col items-center">
-                        <span className="text-3xl mb-2">🥇</span>
                         <div className="w-24 bg-yellow-500/20 rounded-t-lg flex flex-col items-center justify-end pb-2" style={{ height: '100px' }}>
                           <p className="font-bold truncate max-w-full px-1">{results.players[0].nickname}</p>
-                          <p className="text-2xl font-black text-yellow-400">{results.players[0].score}</p>
+                          <p className="text-2xl font-bold text-amber-300/70">{results.players[0].score}</p>
                         </div>
                       </div>
                     )}
@@ -327,10 +322,9 @@ export default function AudienceSession() {
                     {/* 3rd Place */}
                     {results.players[2] && (
                       <div className="flex flex-col items-center">
-                        <span className="text-xl mb-2">🥉</span>
                         <div className="w-20 bg-amber-700/20 rounded-t-lg flex flex-col items-center justify-end pb-2" style={{ height: '60px' }}>
                           <p className="font-bold text-sm truncate max-w-full px-1">{results.players[2].nickname}</p>
-                          <p className="text-lg font-black text-amber-500">{results.players[2].score}</p>
+                          <p className="text-lg font-bold text-amber-200">{results.players[2].score}</p>
                         </div>
                       </div>
                     )}
@@ -342,9 +336,9 @@ export default function AudienceSession() {
         </div>
 
         {/* Right Column - Leaderboard */}
-        <div className="bg-white/10 rounded-2xl overflow-hidden h-fit">
+        <div className="bg-white/10 rounded-xl overflow-hidden h-fit">
           <div className="p-4 bg-white/5 border-b border-white/10">
-            <h3 className="font-bold text-lg">📊 Live Leaderboard</h3>
+            <h3 className="font-bold text-lg">Live Leaderboard</h3>
           </div>
           
           <div className="max-h-[500px] overflow-y-auto">
@@ -361,13 +355,13 @@ export default function AudienceSession() {
                 <div 
                   key={entry.id}
                   className={`flex items-center p-4 ${i > 0 ? 'border-t border-white/10' : ''} ${
-                    i < 3 ? 'bg-gradient-to-r from-white/5 to-transparent' : ''
+                    i < 3 ? 'bg-white/[0.03]' : ''
                   }`}
                 >
                   <span className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mr-4 ${
-                    i === 0 ? 'bg-yellow-500 text-black' :
-                    i === 1 ? 'bg-gray-300 text-black' :
-                    i === 2 ? 'bg-amber-700 text-white' :
+                    i === 0 ? 'bg-amber-700/60 text-amber-100' :
+                    i === 1 ? 'bg-slate-500/50 text-slate-200' :
+                    i === 2 ? 'bg-amber-800/40 text-amber-200' :
                     'bg-white/20'
                   }`}>
                     {entry.rank}
@@ -378,7 +372,7 @@ export default function AudienceSession() {
                       {entry.correctAnswers}/{entry.totalAnswers} correct
                     </p>
                   </div>
-                  <span className="text-2xl font-black text-primary">{entry.score}</span>
+                  <span className="text-2xl font-bold text-white/70">{entry.score}</span>
                 </div>
               ))
             )}

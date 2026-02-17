@@ -291,7 +291,7 @@ export default function HostSession() {
           break
         case 'questions_updated':
           // Questions were appended mid-session; session_state will follow
-          console.log(`📝 Questions updated: +${msg.addedCount} (total: ${msg.totalQuestions})`)
+          console.log(`Questions updated: +${msg.addedCount} (total: ${msg.totalQuestions})`)
           break
         case 'error':
           setError(msg.message)
@@ -443,7 +443,7 @@ export default function HostSession() {
       try {
         performanceData = await api.getPerformance(code, hostToken, dynamicConfig.batchSize)
       } catch (perfErr) {
-        console.warn('⚠️  Could not fetch performance data, using defaults:', perfErr)
+        console.warn('Could not fetch performance data, using defaults:', perfErr)
         performanceData = {
           avg_score_percent: 60,
           avg_response_time_ms: 8000,
@@ -458,7 +458,7 @@ export default function HostSession() {
         dynamicConfig.targetCount - session.questions.length
       )
       
-      console.log(`🎲 Generating batch #${nextBatchNumber}: ${questionsToGenerate} questions (performance: ${performanceData.avg_score_percent}% correct, ${performanceData.avg_response_time_ms}ms avg)`)
+      console.log(`Generating batch #${nextBatchNumber}: ${questionsToGenerate} questions (performance: ${performanceData.avg_score_percent}% correct, ${performanceData.avg_response_time_ms}ms avg)`)
       
       const result = await api.generateDynamicBatch({
         topics: dynamicConfig.topics,
@@ -484,7 +484,7 @@ export default function HostSession() {
         setDynamicConfig(updatedConfig)
         sessionStorage.setItem(`dynamic_${code}`, JSON.stringify(updatedConfig))
         
-        console.log(`✅ Appended ${result.questions.length} new questions (${result.suggested_difficulty} difficulty)`)
+        console.log(`Appended ${result.questions.length} new questions (${result.suggested_difficulty} difficulty)`)
       }
     } catch (e) {
       console.error('Failed to generate next batch:', e)
@@ -710,7 +710,7 @@ export default function HostSession() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold font-mono text-secondary">{code}</h1>
+            <h1 className="text-2xl font-bold font-mono text-white/70">{code}</h1>
             <button
               onClick={() => {
                 const link = `${window.location.origin}/#/join/${code}`
@@ -739,7 +739,7 @@ export default function HostSession() {
       </div>
 
       {/* Host Controls Drawer */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/5">
+      <div className="mb-4 rounded-xl border border-white/10 bg-white/5">
         <button
           onClick={() => setControlsOpen(prev => !prev)}
           className="w-full px-4 py-3 flex items-center justify-between text-left"
@@ -811,21 +811,21 @@ export default function HostSession() {
 
       {/* Connection mode indicator */}
       {connectionMode === 'polling' && (
-        <div className="mb-4 p-2 bg-yellow-500/20 border border-yellow-500/50 rounded-lg text-yellow-300 text-sm text-center">
-          📡 Using polling mode (corporate network detected)
+        <div className="mb-4 p-2 bg-amber-900/20 border border-amber-800/30 text-amber-300/70 rounded-lg text-sm text-center">
+          Polling mode (corporate network detected)
         </div>
       )}
       
       {/* Dynamic mode indicator */}
       {dynamicConfig && (
-        <div className="mb-4 p-2 bg-purple-500/20 border border-purple-500/50 rounded-lg text-purple-300 text-sm text-center">
-          🎲 Dynamic Mode: {session.questions.length}/{dynamicConfig.targetCount} questions
+        <div className="mb-4 p-2 bg-slate-700/30 border border-slate-600/30 rounded-lg text-white/60 text-sm text-center">
+          Dynamic Mode: {session.questions.length}/{dynamicConfig.targetCount} questions
           {generatingBatch && <span className="ml-2 animate-pulse">• Generating next batch...</span>}
         </div>
       )}
 
       {error && (
-        <div className="mb-4 p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300">
+        <div className="mb-4 p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300/80">
           {error}
           <button onClick={() => setError(null)} className="ml-2 underline">dismiss</button>
         </div>
@@ -834,7 +834,7 @@ export default function HostSession() {
       {/* Lobby State */}
       {session.status === 'lobby' && (
         <div className="space-y-6 animate-slide-up">
-          <div className="bg-white/10 rounded-2xl p-6">
+          <div className="bg-white/10 rounded-xl p-6">
             <h2 className="text-xl font-bold mb-4">Waiting for Players</h2>
             
             {session.players.length === 0 ? (
@@ -851,7 +851,7 @@ export default function HostSession() {
           </div>
 
           {/* Share Links */}
-          <div className="bg-white/10 rounded-2xl p-6">
+          <div className="bg-white/10 rounded-xl p-6">
             <h2 className="text-lg font-bold mb-3">Share Links</h2>
             <div className="space-y-3">
               {/* Player join link */}
@@ -906,7 +906,7 @@ export default function HostSession() {
           <div className="text-center text-white/60">
             <p>{session.questions.length} questions loaded</p>
             {session.settings?.timerMode && (
-              <p className="text-secondary mt-1">⏱️ Timer mode: {session.settings.timerSeconds}s per question</p>
+              <p className="text-white/70 mt-1">Timer mode: {session.settings.timerSeconds}s per question</p>
             )}
           </div>
 
@@ -914,7 +914,7 @@ export default function HostSession() {
             <button
               onClick={handleStart}
               disabled={loading || session.players.length === 0}
-              className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-teal-800/50 border border-teal-700/40 hover:bg-teal-800/70 text-teal-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Starting...' : 'Start Round'}
             </button>
@@ -929,7 +929,7 @@ export default function HostSession() {
           <div className="flex items-center gap-4">
             <div className="flex-1 h-2 bg-white/20 rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary transition-all duration-300"
+                className="h-full bg-slate-600/60 transition-all duration-300"
                 style={{ width: `${((session.currentQuestionIndex + 1) / session.questions.length) * 100}%` }}
               />
             </div>
@@ -951,7 +951,7 @@ export default function HostSession() {
                   />
                   <circle
                     cx="40" cy="40" r="36"
-                    stroke={timerRemaining <= 5 ? '#ef4444' : timerRemaining <= 10 ? '#f59e0b' : '#6366f1'}
+                    stroke={timerRemaining <= 5 ? '#ef4444' : timerRemaining <= 10 ? '#f59e0b' : '#64748b'}
                     strokeWidth="8"
                     fill="none"
                     strokeDasharray={`${(timerRemaining / (session.settings?.timerSeconds || 15)) * 226} 226`}
@@ -960,7 +960,7 @@ export default function HostSession() {
                   />
                 </svg>
                 <span className={`absolute inset-0 flex items-center justify-center text-2xl font-bold ${
-                  timerRemaining <= 5 ? 'text-red-400' : timerRemaining <= 10 ? 'text-yellow-400' : 'text-white'
+                  timerRemaining <= 5 ? 'text-red-400' : timerRemaining <= 10 ? 'text-white/70' : 'text-white'
                 }`}>
                   {timerRemaining}
                 </span>
@@ -969,7 +969,7 @@ export default function HostSession() {
           )}
 
           {/* Question */}
-          <div className="bg-white/10 rounded-2xl p-6">
+          <div className="bg-white/10 rounded-xl p-6">
             <h2 className={`${presentationMode ? 'text-3xl md:text-4xl' : 'text-xl md:text-2xl'} font-bold mb-6`}>
               {currentQuestion.question}
             </h2>
@@ -989,7 +989,7 @@ export default function HostSession() {
 
           {/* Host Player Answer Panel */}
           {isHostPlayer && !presentationMode && (
-            <div className="bg-white/10 rounded-2xl p-4">
+            <div className="bg-white/10 rounded-xl p-4">
               <div className="flex items-center justify-between mb-3">
                 <div>
                   <p className="text-sm text-white/60">Your Answer</p>
@@ -1008,7 +1008,7 @@ export default function HostSession() {
                     disabled={hostAnswerLocked || (session.settings?.timerMode && timerRemaining === 0)}
                     className={`px-3 py-3 rounded-xl border text-left transition-all ${
                       hostSelectedAnswer === i
-                        ? 'bg-primary/30 border-primary/60'
+                        ? 'bg-slate-600/30 border-slate-600/60'
                         : 'bg-white/5 border-white/10 hover:bg-white/10'
                     } ${hostAnswerLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
                   >
@@ -1040,7 +1040,7 @@ export default function HostSession() {
                 onClick={() => setShowLiveStats(!showLiveStats)}
                 className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
               >
-                <span className="font-medium">📊 Live Answer Distribution</span>
+                <span className="font-medium">Live Answer Distribution</span>
                 <span className="text-white/60">{showLiveStats ? '▲' : '▼'}</span>
               </button>
               
@@ -1087,7 +1087,7 @@ export default function HostSession() {
             <div className="bg-white/5 rounded-xl p-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-white/60">
-                  <span className="text-2xl font-bold text-primary">{answeredCount}</span>
+                  <span className="text-2xl font-bold text-white/70">{answeredCount}</span>
                   <span className="mx-1">/</span>
                   <span>{session.players.length}</span>
                   <span className="ml-2">answered</span>
@@ -1115,7 +1115,7 @@ export default function HostSession() {
                     </div>
                   </div>
                   <div>
-                    <p className="text-yellow-400 text-sm font-medium mb-2">⏳ Waiting ({session.players.length - answeredCount})</p>
+                    <p className="text-white/70 text-sm font-medium mb-2"><span className="w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60 animate-spin inline-block"></span> Waiting ({session.players.length - answeredCount})</p>
                     <div className="flex flex-wrap gap-1">
                       {session.players
                         .filter(p => p.answers[session.currentQuestionIndex] === undefined && !answerStatus.answered.includes(p.id))
@@ -1138,7 +1138,7 @@ export default function HostSession() {
                 onClick={() => setShowLeaderboard(!showLeaderboard)}
                 className="w-full p-3 flex items-center justify-between hover:bg-white/5 transition-colors"
               >
-                <span className="font-medium">📊 Live Leaderboard</span>
+                <span className="font-medium">Live Leaderboard</span>
                 <span className="text-white/60">{showLeaderboard ? '▲' : '▼'}</span>
               </button>
               
@@ -1147,16 +1147,16 @@ export default function HostSession() {
                   {leaderboard.slice(0, 5).map((entry, i) => (
                     <div key={entry.id} className={`flex items-center p-3 ${i > 0 ? 'border-t border-white/10' : ''}`}>
                       <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold mr-3 ${
-                        i === 0 ? 'bg-yellow-500 text-black' :
-                        i === 1 ? 'bg-gray-300 text-black' :
-                        i === 2 ? 'bg-amber-700 text-white' :
+                        i === 0 ? 'bg-amber-700/60 text-amber-100' :
+                        i === 1 ? 'bg-slate-500/50 text-slate-200' :
+                        i === 2 ? 'bg-amber-800/40 text-amber-200' :
                         'bg-white/20'
                       }`}>
                         {entry.rank}
                       </span>
                       <span className="flex-1 truncate">{entry.nickname}</span>
                       <span className="text-sm text-white/60 mr-2">{entry.correctAnswers}/{entry.totalAnswers}</span>
-                      <span className="font-bold text-primary">{entry.score}</span>
+                      <span className="font-bold text-white/70">{entry.score}</span>
                     </div>
                   ))}
                 </div>
@@ -1171,7 +1171,7 @@ export default function HostSession() {
                 <button
                   onClick={handleNext}
                   disabled={loading}
-                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-primary hover:bg-indigo-600 transition-all disabled:opacity-50"
+                  className="flex-1 py-4 text-lg font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50"
                 >
                   Next Question →
                 </button>
@@ -1179,9 +1179,9 @@ export default function HostSession() {
                 <button
                   onClick={handleReveal}
                   disabled={loading}
-                  className="flex-1 py-4 text-lg font-bold rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50"
+                  className="flex-1 py-4 text-lg font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50"
                 >
-                  🏆 Reveal Results
+                  Reveal Results
                 </button>
               )}
               
@@ -1189,7 +1189,7 @@ export default function HostSession() {
                 <button
                   onClick={handleReveal}
                   disabled={loading}
-                  className="py-4 px-6 text-lg font-bold rounded-2xl bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
+                  className="py-4 px-6 text-lg font-semibold rounded-xl bg-white/10 hover:bg-white/20 transition-all disabled:opacity-50"
                 >
                   End Early
                 </button>
@@ -1222,19 +1222,19 @@ export default function HostSession() {
       {/* Revealed State */}
       {session.status === 'revealed' && results && (
         <div className="space-y-6 animate-slide-up">
-          <h2 className="text-3xl font-bold text-center mb-6">🏆 Final Results</h2>
+          <h2 className="text-3xl font-bold text-center mb-6">Final Results</h2>
           
           {/* Leaderboard */}
-          <div className="bg-white/10 rounded-2xl overflow-hidden">
+          <div className="bg-white/10 rounded-xl overflow-hidden">
             {results.players.map((p, i) => (
               <div 
                 key={p.id}
                 className={`flex items-center p-4 ${i > 0 ? 'border-t border-white/10' : ''}`}
               >
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold mr-4 ${
-                  i === 0 ? 'bg-yellow-500 text-black' :
-                  i === 1 ? 'bg-gray-300 text-black' :
-                  i === 2 ? 'bg-amber-700 text-white' :
+                  i === 0 ? 'bg-amber-700/60 text-amber-100' :
+                  i === 1 ? 'bg-slate-500/50 text-slate-200' :
+                  i === 2 ? 'bg-amber-800/40 text-amber-200' :
                   'bg-white/20'
                 }`}>
                   {p.rank}
@@ -1245,27 +1245,27 @@ export default function HostSession() {
                     {p.totalTime.toFixed(1)}s
                   </span>
                 </div>
-                <span className="text-xl font-bold text-primary">{p.score}</span>
+                <span className="text-xl font-bold text-white/70">{p.score}</span>
               </div>
             ))}
           </div>
           <p className="text-center text-white/40 text-sm">
-            Ties broken by fastest total answer time ⚡
+            Ties broken by fastest total answer time
           </p>
 
           {/* Post-Game Actions */}
           <div className="flex flex-col sm:flex-row gap-3">
             <Link
               to="/host"
-              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all hover:scale-105 active:scale-95"
+              className="flex-1 py-4 text-lg font-semibold text-center rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all active:scale-[0.98]"
             >
-              🎮 Host New Game
+              Host New Game
             </Link>
             <Link
               to="/"
-              className="flex-1 py-4 text-lg font-bold text-center rounded-2xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
+              className="flex-1 py-4 text-lg font-semibold text-center rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 transition-all"
             >
-              🏠 Home
+              Home
             </Link>
           </div>
 
@@ -1285,7 +1285,7 @@ export default function HostSession() {
                     </p>
                     {q.explanation && (
                       <p className="text-white/60 text-sm mt-2 italic">
-                        💡 {q.explanation}
+                        {q.explanation}
                       </p>
                     )}
                     
@@ -1298,8 +1298,8 @@ export default function HostSession() {
                             : 'bg-yellow-500/10 border border-yellow-500/30'
                         }`}>
                           <div className="flex items-center gap-2 mb-1">
-                            <span>{factCheckResults[i].verified ? '✅' : '⚠️'}</span>
-                            <span className={`font-medium ${factCheckResults[i].verified ? 'text-green-400' : 'text-yellow-400'}`}>
+                            <span>{factCheckResults[i].verified ? '✓' : 'Uncertain'}</span>
+                            <span className={`font-medium ${factCheckResults[i].verified ? 'text-green-400' : 'text-white/70'}`}>
                               {factCheckResults[i].verified ? 'Verified' : 'Uncertain'}
                             </span>
                             <span className="text-white/40 text-xs">
@@ -1308,7 +1308,7 @@ export default function HostSession() {
                           </div>
                           <p className="text-white/70 text-sm">{factCheckResults[i].explanation}</p>
                           {factCheckResults[i].source_hint && (
-                            <p className="text-white/40 text-xs mt-1">📚 {factCheckResults[i].source_hint}</p>
+                            <p className="text-white/40 text-xs mt-1">{factCheckResults[i].source_hint}</p>
                           )}
                         </div>
                       ) : (
@@ -1319,12 +1319,11 @@ export default function HostSession() {
                         >
                           {factCheckLoading === i ? (
                             <>
-                              <span className="animate-spin">⏳</span>
+                              <span className="w-3 h-3 rounded-full border-2 border-white/20 border-t-white/60 animate-spin inline-block"></span>
                               Checking...
                             </>
                           ) : (
                             <>
-                              <span>🔍</span>
                               Fact-Check This Answer
                             </>
                           )}
@@ -1348,7 +1347,7 @@ export default function HostSession() {
                 </div>
 
                 {challengeError && (
-                  <div className="p-3 rounded-lg bg-red-500/20 border border-red-500/40 text-red-300 text-sm">
+                  <div className="p-3 rounded-lg bg-red-900/20 border border-red-800/30 text-red-300/80 text-sm">
                     {challengeError}
                   </div>
                 )}
@@ -1368,7 +1367,7 @@ export default function HostSession() {
                       onClick={() => loadChallengeDetail(challenge.questionIndex)}
                       className={`w-full text-left p-3 rounded-xl border transition-colors ${
                         challengeDetail?.questionIndex === challenge.questionIndex
-                          ? 'border-primary/60 bg-primary/10'
+                          ? 'border-slate-600/60 bg-slate-600/10'
                           : 'border-white/10 bg-white/5 hover:bg-white/10'
                       }`}
                     >
@@ -1403,7 +1402,7 @@ export default function HostSession() {
                         ))}
                       </div>
                       {challengeDetail.explanation && (
-                        <p className="text-white/60 text-sm mt-2 italic">💡 {challengeDetail.explanation}</p>
+                        <p className="text-white/60 text-sm mt-2 italic">{challengeDetail.explanation}</p>
                       )}
                     </div>
 
@@ -1436,7 +1435,7 @@ export default function HostSession() {
                       onClick={() => openHostThread(challengeDetail.questionIndex)}
                       className="w-full text-sm py-2.5 rounded-lg bg-white/10 border border-white/20 hover:bg-white/20 transition-all flex items-center justify-center gap-2"
                     >
-                      💬 View Player Discussion
+                      View Player Discussion
                     </button>
 
                     <div className="space-y-2">
@@ -1485,7 +1484,7 @@ export default function HostSession() {
                       </label>
                       <button
                         onClick={handleResolutionSave}
-                        className="px-3 py-2 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30"
+                        className="px-3 py-2 rounded-lg bg-slate-600/20 border border-slate-600/40 text-sm hover:bg-slate-600/30"
                       >
                         Save Resolution
                       </button>
@@ -1517,7 +1516,7 @@ export default function HostSession() {
                               value={authTokenDraft}
                               onChange={(e) => setAuthTokenDraft(e.target.value)}
                               placeholder="Auth token / access code"
-                              className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-primary/50"
+                              className="flex-1 rounded-lg bg-white/10 border border-white/20 px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:border-slate-500/50"
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter') handleSaveAuthToken()
                               }}
@@ -1526,7 +1525,7 @@ export default function HostSession() {
                             <button
                               onClick={handleSaveAuthToken}
                               disabled={!authTokenDraft.trim()}
-                              className="px-3 py-1.5 rounded-lg bg-primary/20 border border-primary/40 text-sm hover:bg-primary/30 disabled:opacity-50"
+                              className="px-3 py-1.5 rounded-lg bg-slate-600/20 border border-slate-600/40 text-sm hover:bg-slate-600/30 disabled:opacity-50"
                             >
                               Save
                             </button>
@@ -1561,7 +1560,7 @@ export default function HostSession() {
                             className="px-3 py-2 rounded-lg text-xs text-white/40 hover:text-white/70 transition-colors"
                             title={authToken ? 'Update auth token' : 'Set auth token'}
                           >
-                            {authToken ? '🔑 Update Token' : '🔑 Set Token'}
+                            {authToken ? 'Update Token' : 'Set Token'}
                           </button>
                         )}
                       </div>
@@ -1616,7 +1615,7 @@ export default function HostSession() {
       {/* Host Discussion Thread Modal */}
       {threadOpen !== null && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-gray-900 border border-white/20 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
+          <div className="bg-gray-900 border border-white/20 rounded-t-xl sm:rounded-xl w-full sm:max-w-lg max-h-[85vh] flex flex-col animate-slide-up">
             {/* Thread header */}
             <div className="flex items-center justify-between p-4 border-b border-white/10 shrink-0">
               <div>
@@ -1647,7 +1646,6 @@ export default function HostSession() {
                 <div key={idx} className="rounded-xl bg-white/5 border border-white/10 p-3">
                   {/* Challenge submission */}
                   <div className="flex items-start gap-2">
-                    <span className="text-lg shrink-0 mt-0.5">🚩</span>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-semibold text-sm text-white/90">{entry.nickname}</span>
@@ -1668,10 +1666,10 @@ export default function HostSession() {
                       {/* Vote tally (read-only for host) */}
                       <div className="flex items-center gap-3 mt-2">
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/50">
-                          👍 Agree
+                          Agree
                         </span>
                         <span className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg bg-white/5 border border-white/10 text-white/50">
-                          👎 Disagree
+                          Disagree
                         </span>
                         <span className={`text-xs font-medium ${
                           entry.voteScore > 0 ? 'text-green-400' : entry.voteScore < 0 ? 'text-red-400' : 'text-white/40'
@@ -1688,7 +1686,7 @@ export default function HostSession() {
                       {entry.replies.map((reply) => (
                         <div key={reply.replyId} className="text-sm">
                           <div className="flex items-center gap-2">
-                            <span className={`font-medium ${reply.playerId === 'host' ? 'text-primary' : 'text-white/80'}`}>
+                            <span className={`font-medium ${reply.playerId === 'host' ? 'text-white/70' : 'text-white/80'}`}>
                               {reply.nickname}{reply.playerId === 'host' ? ' (Host)' : ''}
                             </span>
                             <span className="text-xs text-white/40">
@@ -1713,7 +1711,6 @@ export default function HostSession() {
                     : 'bg-amber-500/10 border-amber-400/30'
                 }`}>
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-lg">🤖</span>
                     <span className="font-bold text-xs text-white/90 uppercase tracking-wide">AI Verification</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
                       threadData.aiVerification.verdict === 'valid'
@@ -1738,7 +1735,6 @@ export default function HostSession() {
               {!threadLoading && threadData?.resolution && (
                 <div className="rounded-xl bg-green-500/10 border border-green-400/30 p-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">⚖️</span>
                     <span className="font-bold text-sm text-green-300 uppercase">
                       Resolution: {threadData.resolution.verdict || threadData.resolution.status.replace(/_/g, ' ')}
                     </span>
@@ -1764,7 +1760,7 @@ export default function HostSession() {
                 <button
                   onClick={submitHostReply}
                   disabled={!hostReplyText.trim() || hostReplySubmitting}
-                  className="px-4 py-2 rounded-lg bg-primary/80 hover:bg-primary text-sm font-medium disabled:opacity-40 transition-all shrink-0"
+                  className="px-4 py-2 rounded-lg bg-slate-600/60 hover:bg-slate-600/80 text-sm font-medium disabled:opacity-40 transition-all shrink-0"
                 >
                   {hostReplySubmitting ? '...' : 'Send'}
                 </button>

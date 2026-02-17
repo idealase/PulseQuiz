@@ -44,7 +44,7 @@ export default function PlayerJoin() {
   return (
     <div className="h-[100dvh] flex flex-col items-center justify-center px-5 py-3 sm:p-6">
       <div className="w-full max-w-md animate-slide-up">
-        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8">Join Game</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold text-center mb-8 tracking-tight">Join Game</h1>
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
@@ -55,7 +55,7 @@ export default function PlayerJoin() {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="ABC123"
               maxLength={6}
-              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest rounded-xl bg-white/10 border-2 border-white/20 focus:border-primary focus:outline-none transition-colors uppercase"
+              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest rounded-xl bg-white/5 border border-white/15 focus:border-slate-500 focus:outline-none transition-colors uppercase"
               autoComplete="off"
               autoFocus={!urlCode}
             />
@@ -69,14 +69,14 @@ export default function PlayerJoin() {
               onChange={(e) => setNickname(e.target.value)}
               placeholder="Enter nickname"
               maxLength={20}
-              className="w-full px-4 py-4 text-xl rounded-xl bg-white/10 border-2 border-white/20 focus:border-primary focus:outline-none transition-colors"
+              className="w-full px-4 py-4 text-xl rounded-xl bg-white/5 border border-white/15 focus:border-slate-500 focus:outline-none transition-colors"
               autoComplete="off"
               autoFocus={!!urlCode}
             />
           </div>
 
           {error && (
-            <div className="p-4 bg-red-500/20 border border-red-500 rounded-lg text-red-300 text-center">
+            <div className="p-4 bg-red-900/20 border border-red-800/30 rounded-lg text-red-300/80 text-center">
               {error}
             </div>
           )}
@@ -84,7 +84,7 @@ export default function PlayerJoin() {
           <button
             type="submit"
             disabled={loading || !code.trim() || !nickname.trim()}
-            className="w-full py-4 px-8 text-lg sm:text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-lg sm:text-xl font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
           >
             {loading ? 'Joining...' : 'Join'}
           </button>

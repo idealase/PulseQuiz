@@ -280,8 +280,8 @@ export default function HostCreate() {
       {!sessionCode ? (
         <div className="space-y-6 animate-slide-up">
           {/* Timer Mode Settings */}
-          <div className="bg-white/10 rounded-2xl p-6">
-            <h2 className="text-lg font-bold mb-4">Game Settings</h2>
+          <div className="bg-white/10 rounded-xl p-6">
+            <h2 className="text-lg font-semibold mb-4">Game Settings</h2>
 
             <div className="mb-5 space-y-3">
               <p className="text-white/60 text-sm">Host Role</p>
@@ -334,7 +334,7 @@ export default function HostCreate() {
                 onChange={(e) => setTimerMode(e.target.checked)}
                 className="w-5 h-5 rounded accent-primary"
               />
-              <span className="font-medium">⏱️ Auto-advance Timer Mode</span>
+              <span className="font-medium">Auto-advance Timer Mode</span>
             </label>
             
             {timerMode && (
@@ -349,7 +349,7 @@ export default function HostCreate() {
                     onChange={(e) => setTimerSeconds(Number(e.target.value))}
                     className="flex-1 accent-primary"
                   />
-                  <span className="w-12 text-center font-mono text-lg font-bold text-secondary">
+                  <span className="w-12 text-center font-mono text-lg font-bold text-white/70">
                     {timerSeconds}s
                   </span>
                 </div>
@@ -364,9 +364,9 @@ export default function HostCreate() {
                 type="checkbox"
                 checked={autoProgressMode}
                 onChange={(e) => setAutoProgressMode(e.target.checked)}
-                className="w-5 h-5 rounded accent-green-500"
+                className="w-5 h-5 rounded accent-slate-500"
               />
-              <span className="font-medium">👥 Auto-advance by Participation</span>
+              <span className="font-medium">Auto-advance by Participation</span>
             </label>
             
             {autoProgressMode && (
@@ -380,9 +380,9 @@ export default function HostCreate() {
                     step="5"
                     value={autoProgressPercent}
                     onChange={(e) => setAutoProgressPercent(Number(e.target.value))}
-                    className="flex-1 accent-green-500"
+                    className="flex-1 accent-slate-500"
                   />
-                  <span className="w-14 text-center font-mono text-lg font-bold text-green-400">
+                  <span className="w-14 text-center font-mono text-lg font-bold text-teal-400/70">
                     {autoProgressPercent}%
                   </span>
                 </div>
@@ -396,7 +396,7 @@ export default function HostCreate() {
           <button
             onClick={handleCreateSession}
             disabled={loading}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-primary to-indigo-500 hover:from-indigo-600 hover:to-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Starting...' : 'Start Game'}
           </button>
@@ -410,9 +410,9 @@ export default function HostCreate() {
       ) : (
         <div className="space-y-6 animate-slide-up">
           {/* AI Quiz Generation */}
-          <div className="bg-gradient-to-br from-purple-500/10 to-indigo-500/10 border border-purple-500/30 rounded-2xl p-6">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <span>✨</span> Generate with AI
+          <div className="bg-white/[0.03] border border-white/10 rounded-xl p-6">
+            <h3 className="text-lg font-semibold mb-4">
+              Generate with AI
             </h3>
             
             {/* Auth Token Input (shown when needed) */}
@@ -424,7 +424,7 @@ export default function HostCreate() {
                   value={aiAuthToken}
                   onChange={(e) => setAiAuthToken(e.target.value)}
                   placeholder="Enter your access code..."
-                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-purple-500 focus:outline-none"
+                  className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:border-slate-500 focus:outline-none"
                 />
               </div>
             )}
@@ -437,14 +437,14 @@ export default function HostCreate() {
                 value={aiTopics}
                 onChange={(e) => setAiTopics(e.target.value)}
                 placeholder="AI, Australian History, Space..."
-                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:border-purple-500 focus:outline-none text-white placeholder-white/40"
+                className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-xl focus:border-slate-500 focus:outline-none text-white placeholder-white/40"
               />
             </div>
             
             {/* Question Count Slider */}
             <div className="mb-4">
               <label className="text-sm text-white/60 block mb-2">
-                Number of questions: <span className="text-purple-400 font-bold">{aiQuestionCount}</span>
+                Number of questions: <span className="text-white/70 font-medium">{aiQuestionCount}</span>
               </label>
               <input
                 type="range"
@@ -452,7 +452,7 @@ export default function HostCreate() {
                 max="50"
                 value={aiQuestionCount}
                 onChange={(e) => setAiQuestionCount(Number(e.target.value))}
-                className="w-full accent-purple-500"
+                className="w-full accent-slate-500"
               />
             </div>
             
@@ -463,10 +463,10 @@ export default function HostCreate() {
                   type="checkbox"
                   checked={aiResearchMode}
                   onChange={(e) => setAiResearchMode(e.target.checked)}
-                  className="w-5 h-5 mt-0.5 rounded accent-purple-500"
+                  className="w-5 h-5 mt-0.5 rounded accent-slate-500"
                 />
                 <div>
-                  <span className="font-medium">🔬 Research Mode</span>
+                  <span className="font-medium">Research Mode</span>
                   <p className="text-white/40 text-xs mt-0.5">Deeper topic research • Uses more AI credits</p>
                 </div>
               </label>
@@ -481,10 +481,10 @@ export default function HostCreate() {
                     setDynamicToggleGuard(true)
                     setTimeout(() => setDynamicToggleGuard(false), 200)
                   }}
-                  className="w-5 h-5 mt-0.5 rounded accent-purple-500"
+                  className="w-5 h-5 mt-0.5 rounded accent-slate-500"
                 />
                 <div>
-                  <span className="font-medium">🎲 Dynamic Mode</span>
+                  <span className="font-medium">Dynamic Mode</span>
                   <p className="text-white/40 text-xs mt-0.5">Adapts difficulty to player performance • Generates questions in batches</p>
                 </div>
               </label>
@@ -494,15 +494,15 @@ export default function HostCreate() {
             <button
               onClick={handleAiGenerate}
               disabled={aiGenerating || !aiTopics.trim() || dynamicToggleGuard}
-              className="w-full py-3 px-6 font-bold rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full py-3 px-6 font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {aiGenerating ? (
                 <>
-                  <span className="animate-spin">⏳</span> Generating...
+                  <span className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white/60 animate-spin"></span> Generating...
                 </>
               ) : (
                 <>
-                  <span>✨</span> {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
+                  {aiDynamicMode ? 'Generate Initial Batch (10)' : 'Generate Quiz'}
                 </>
               )}
             </button>
@@ -510,9 +510,9 @@ export default function HostCreate() {
             <button
               onClick={handleThemePreview}
               disabled={themeGenerating || !aiTopics.trim() || lockTheme || !experimentalTheme}
-              className="w-full py-2.5 px-6 font-semibold rounded-xl border border-purple-500/50 text-purple-200 hover:bg-purple-500/10 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full py-2.5 px-6 font-semibold rounded-xl border border-slate-500/40 text-white/60 hover:bg-white/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {themeGenerating ? 'Previewing Theme...' : '🎨 Preview Theme'}
+              {themeGenerating ? 'Previewing Theme...' : 'Preview Theme'}
             </button>
             
             {/* Generation Stats */}
@@ -534,7 +534,7 @@ export default function HostCreate() {
           <details className="group">
             <summary className="cursor-pointer list-none">
               <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl hover:bg-white/10 transition-colors">
-                <span className="font-medium">📚 Preset Quiz Packs</span>
+                <span className="font-medium">Preset Quiz Packs</span>
                 <span className="text-white/60 group-open:rotate-180 transition-transform">▼</span>
               </div>
             </summary>
@@ -550,8 +550,7 @@ export default function HostCreate() {
                   }}
                   className="w-full px-4 py-3 text-left font-medium rounded-xl bg-white/10 border border-white/30 hover:bg-white/20 hover:border-white/50 transition-all"
                 >
-                  <span className="text-xl mr-2">{set.emoji}</span>
-                  <span className="font-bold">{set.name}</span>
+                  <span className="font-semibold">{set.name}</span>
                   <span className="text-white/50 text-sm ml-2">— {set.description}</span>
                 </button>
               ))}
@@ -563,7 +562,7 @@ export default function HostCreate() {
             onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
             onDragLeave={() => setDragActive(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-2xl p-8 text-center transition-colors ${
+            className={`border border-dashed rounded-xl p-8 text-center transition-colors ${
               dragActive 
                 ? 'border-primary bg-primary/10' 
                 : 'border-white/30 hover:border-white/50'
@@ -577,7 +576,7 @@ export default function HostCreate() {
               id="csv-upload"
             />
             <label htmlFor="csv-upload" className="cursor-pointer">
-              <div className="text-4xl mb-2">📄</div>
+              <div className="text-white/40 text-sm mb-2">CSV</div>
               <p className="font-medium">
                 {questions.length > 0 
                   ? `${questions.length} questions loaded`
@@ -591,15 +590,15 @@ export default function HostCreate() {
           </div>
 
           {/* Session Code Display */}
-          <div className="bg-white/10 rounded-2xl p-6 text-center">
+          <div className="bg-white/10 rounded-xl p-6 text-center">
             <p className="text-white/60 text-base mb-2">Session Code</p>
-            <p className="text-5xl sm:text-6xl font-mono font-bold tracking-wider text-secondary">
+            <p className="text-5xl sm:text-6xl font-mono font-bold tracking-wider text-white/70">
               {sessionCode}
             </p>
           </div>
 
           {/* QR Code */}
-          <div className="bg-white rounded-2xl p-6 flex flex-col items-center">
+          <div className="bg-white rounded-xl p-6 flex flex-col items-center">
             <QRCodeSVG value={joinUrl} size={180} level="M" />
             <p className="text-gray-600 text-sm mt-3">Scan to join</p>
           </div>
@@ -646,7 +645,7 @@ export default function HostCreate() {
           <button
             onClick={handleStartSession}
             disabled={loading || questions.length === 0 || generationActive}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-teal-800/50 border border-teal-700/40 hover:bg-teal-800/70 text-teal-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Starting...' : generationActive ? 'Preparing...' : `Start with ${questions.length} Questions`}
           </button>
@@ -655,9 +654,9 @@ export default function HostCreate() {
 
       {generationActive && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/90 p-6 text-center">
-            <div className="text-3xl mb-3">⏳</div>
-            <h3 className="text-lg font-bold">Preparing your game</h3>
+          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-900/90 p-6 text-center">
+            <div className="w-8 h-8 rounded-full border-2 border-white/20 border-t-white/60 animate-spin mb-3 mx-auto"></div>
+            <h3 className="text-lg font-semibold">Preparing your game</h3>
             <p className="text-white/60 text-sm mt-1">
               {aiGenerating && themeGenerating
                 ? 'Generating questions and theme...'

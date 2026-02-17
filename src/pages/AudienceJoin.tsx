@@ -42,7 +42,7 @@ export default function AudienceJoin() {
   return (
     <div className="h-[100dvh] flex flex-col items-center justify-center px-5 py-3 sm:p-6">
       <div className="w-full max-w-md animate-slide-up">
-        <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-center">👀 Watch Game</h1>
+        <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-center tracking-tight">Watch Game</h1>
         <p className="text-white/60 text-center text-base mb-8">
           Spectate without playing
         </p>
@@ -56,7 +56,7 @@ export default function AudienceJoin() {
               onChange={(e) => setCode(e.target.value.toUpperCase())}
               placeholder="Enter code"
               maxLength={6}
-              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest bg-white/10 border border-white/30 rounded-2xl focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/50 uppercase placeholder:text-white/30"
+              className="w-full px-4 py-4 text-2xl font-mono text-center tracking-widest bg-white/10 border border-white/15 rounded-xl focus:outline-none focus:border-slate-500 uppercase placeholder:text-white/30"
               autoFocus
             />
           </div>
@@ -70,9 +70,9 @@ export default function AudienceJoin() {
           <button
             type="submit"
             disabled={loading || code.length < 4}
-            className="w-full py-4 px-8 text-xl font-bold rounded-2xl bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-4 px-8 text-xl font-semibold rounded-xl bg-slate-600/60 border border-slate-500/40 hover:bg-slate-600/80 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {loading ? 'Connecting...' : '👁️ Watch'}
+            {loading ? 'Connecting...' : 'Watch'}
           </button>
         </form>
 
