@@ -94,6 +94,7 @@ if $SHOW_HELP; then
     gray "  gpt-5.1-codex-mini"
     gray "  gpt-5-mini"
     gray "  gpt-4.1"
+    gray "  (default: gpt-5.2)"
     echo ""
     white "Example:"
     gray "  ./start.sh --copilot-model gpt-5.2-codex"
@@ -229,7 +230,7 @@ if [[ -n "$COPILOT_MODEL" ]]; then
 elif [[ -n "${QUIZ_COPILOT_MODEL:-}" ]]; then
     success "   QUIZ_COPILOT_MODEL: ✅ $QUIZ_COPILOT_MODEL"
 else
-    gray "   QUIZ_COPILOT_MODEL: ℹ️ Not set (default gpt-4.1)"
+    gray "   QUIZ_COPILOT_MODEL: ℹ️ Not set (default gpt-5.2)"
 fi
 
 if [[ -n "${GITHUB_TOKEN:-}" ]]; then

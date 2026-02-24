@@ -45,6 +45,7 @@ if ($Help) {
     Write-Host "  gpt-5.1-codex-mini" -ForegroundColor Gray
     Write-Host "  gpt-5-mini" -ForegroundColor Gray
     Write-Host "  gpt-4.1" -ForegroundColor Gray
+    Write-Host "  (default: gpt-5.2)" -ForegroundColor DarkGray
     Write-Host "" 
     Write-Host "Example:" -ForegroundColor White
     Write-Host "  .\\start.ps1 -CopilotModel gpt-5.2-codex" -ForegroundColor Gray
@@ -134,7 +135,7 @@ if ($CopilotModel) {
 } elseif ($env:QUIZ_COPILOT_MODEL) {
     Write-Host "   QUIZ_COPILOT_MODEL: ✅ $env:QUIZ_COPILOT_MODEL" -ForegroundColor Green
 } else {
-    Write-Host "   QUIZ_COPILOT_MODEL: ℹ️ Not set (default gpt-4.1)" -ForegroundColor Gray
+    Write-Host "   QUIZ_COPILOT_MODEL: ℹ️ Not set (default gpt-5.2)" -ForegroundColor Gray
 }
 
 if ($env:GITHUB_TOKEN) {

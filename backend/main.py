@@ -558,7 +558,7 @@ async def generate_with_copilot(
     """
 
     if not model:
-        model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-4.1")
+        model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-5.2")
 
     # Validate model name (basic sanity check)
     valid_models = [
@@ -567,8 +567,8 @@ async def generate_with_copilot(
         "gpt-5.1-codex", "gpt-5.1", "gpt-5", "gpt-5.1-codex-mini", "gpt-5-mini", "gpt-4.1"
     ]
     if model not in valid_models:
-        copilot_log.warning("Unrecognized model: %s, using default gpt-4.1", model)
-        model = "gpt-4.1"
+        copilot_log.warning("Unrecognized model: %s, using default gpt-5.2", model)
+        model = "gpt-5.2"
 
     # Build the full prompt with system message
     full_prompt = f"""{system_message}
@@ -2593,7 +2593,7 @@ if FRONTEND_DIR.exists():
 async def dev_info():
     """Return system info for the Dev Mode inspector panel."""
     cli_path = find_copilot_cli()
-    model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-4.1")
+    model = os.environ.get("QUIZ_COPILOT_MODEL", "gpt-5.2")
     valid_models = [
         "claude-sonnet-4.5", "claude-haiku-4.5", "claude-opus-4.5", "claude-sonnet-4",
         "gemini-3-pro-preview", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1-codex-max",
