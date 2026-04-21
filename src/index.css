@@ -1,30 +1,31 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --pq-background: #0f172a;
-  --pq-surface: #1e293b;
-  --pq-text: #e2e8f0;
-  --pq-border: #334155;
-  --pq-accent: 100 116 139;
-  --pq-accent-2: 148 163 184;
-  --pq-surface-05: rgba(30, 41, 59, 0.05);
-  --pq-surface-10: rgba(30, 41, 59, 0.1);
-  --pq-surface-15: rgba(30, 41, 59, 0.15);
-  --pq-surface-20: rgba(30, 41, 59, 0.2);
-  --pq-border-10: rgba(51, 65, 85, 0.1);
-  --pq-border-20: rgba(51, 65, 85, 0.2);
-  --pq-border-30: rgba(51, 65, 85, 0.3);
-  --pq-text-40: rgba(226, 232, 240, 0.4);
-  --pq-text-50: rgba(226, 232, 240, 0.5);
-  --pq-text-60: rgba(226, 232, 240, 0.6);
-  --pq-text-80: rgba(226, 232, 240, 0.8);
-  --pq-accent-glow-50: rgba(100, 116, 139, 0.35);
-  --pq-accent-glow-80: rgba(100, 116, 139, 0.55);
-  --pq-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+  /* Terminal Theme (Default - Green Phosphor) */
+  --pq-background: #0a0e0a;
+  --pq-surface: #0f1410;
+  --pq-text: #33ff33;
+  --pq-border: #22aa22;
+  --pq-accent: 51 255 51;
+  --pq-accent-2: 102 255 102;
+  --pq-surface-05: rgba(15, 20, 16, 0.05);
+  --pq-surface-10: rgba(15, 20, 16, 0.1);
+  --pq-surface-15: rgba(15, 20, 16, 0.15);
+  --pq-surface-20: rgba(15, 20, 16, 0.2);
+  --pq-border-10: rgba(34, 170, 34, 0.1);
+  --pq-border-20: rgba(34, 170, 34, 0.2);
+  --pq-border-30: rgba(34, 170, 34, 0.3);
+  --pq-text-40: rgba(51, 255, 51, 0.4);
+  --pq-text-50: rgba(51, 255, 51, 0.5);
+  --pq-text-60: rgba(51, 255, 51, 0.6);
+  --pq-text-80: rgba(51, 255, 51, 0.8);
+  --pq-accent-glow-50: rgba(51, 255, 51, 0.35);
+  --pq-accent-glow-80: rgba(51, 255, 51, 0.55);
+  --pq-font-family: 'JetBrains Mono', 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
 }
 
 * {
@@ -132,8 +133,14 @@ input, select, textarea {
 
 /* Animations */
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 12px var(--pq-accent-glow-50); }
-  50% { box-shadow: 0 0 24px var(--pq-accent-glow-80); }
+  0%, 100% {
+    box-shadow: 0 0 8px var(--pq-accent-glow-50), inset 0 0 8px var(--pq-accent-glow-50);
+    border-color: var(--pq-border);
+  }
+  50% {
+    box-shadow: 0 0 16px var(--pq-accent-glow-80), inset 0 0 8px var(--pq-accent-glow-50);
+    border-color: rgb(var(--pq-accent));
+  }
 }
 
 .animate-pulse-glow {
@@ -141,17 +148,26 @@ input, select, textarea {
 }
 
 @keyframes slide-up {
-  from { transform: translateY(12px); opacity: 0; }
+  from { transform: translateY(8px); opacity: 0; }
   to { transform: translateY(0); opacity: 1; }
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 49% { opacity: 1; }
+  50%, 100% { opacity: 0; }
 }
 
 .animate-slide-up {
-  animation: slide-up 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  animation: slide-up 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.animate-blink {
+  animation: blink 1s step-end infinite;
 }
 
 :root[data-motion='none'] .animate-pulse-glow,
@@ -167,10 +183,11 @@ input, select, textarea {
   animation-duration: 0.25s;
 }
 
-/* Subtle focus ring */
+/* Crisp terminal focus ring */
 *:focus-visible {
-  outline: 2px solid rgba(100, 116, 139, 0.5);
+  outline: 2px solid rgb(var(--pq-accent));
   outline-offset: 2px;
+  box-shadow: 0 0 8px var(--pq-accent-glow-50);
 }
 
 /* Global transition helpers */

@@ -1,8 +1,29 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ThemeIntensity, ThemeSpec } from '../types'
 
-const DEFAULT_THEME: ThemeSpec = {
-  themeId: 'slate',
+const TERMINAL_THEME: ThemeSpec = {
+  themeId: 'terminal',
+  palette: {
+    background: '#0a0e0a',
+    surface: '#0f1410',
+    text: '#33ff33',
+    accent: '#22aa22',
+    accent2: '#66ff66',
+    border: '#22aa22'
+  },
+  typography: {
+    fontFamily: 'mono',
+    weights: { base: 400, strong: 700 },
+    scale: { sm: 0.9, base: 1.0, lg: 1.15, xl: 1.3 }
+  },
+  density: 'comfortable',
+  components: { button: 'outlined', card: 'bordered', table: 'grid' },
+  motion: 'subtle',
+  motifs: 'scanlines'
+}
+
+const CLASSIC_THEME: ThemeSpec = {
+  themeId: 'classic',
   palette: {
     background: '#0f172a',
     surface: '#1e293b',
@@ -22,6 +43,8 @@ const DEFAULT_THEME: ThemeSpec = {
   motifs: null
 }
 
+const DEFAULT_THEME: ThemeSpec = TERMINAL_THEME
+
 const STORAGE_THEME = 'pref_theme_spec'
 const STORAGE_LOCK = 'pref_lock_theme'
 const STORAGE_INTENSITY = 'pref_theme_intensity'
@@ -35,12 +58,18 @@ const FONT_STACKS: Record<string, string> = {
   serif: "'Merriweather', 'Georgia', 'Times New Roman', serif"
 }
 
+export const THEME_PRESETS = {
+  terminal: TERMINAL_THEME,
+  classic: CLASSIC_THEME
+}
+
 const ThemeContext = createContext<{
   theme: ThemeSpec
   lockTheme: boolean
   intensity: ThemeIntensity
   experimentalTheme: boolean
   applyTheme: (theme: ThemeSpec, persist?: boolean) => void
+  applyPreset: (presetId: 'terminal' | 'classic') => void
   resetToDefault: () => void
   setLockTheme: (value: boolean) => void
   setIntensity: (value: ThemeIntensity) => void
@@ -141,6 +170,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const applyPreset = useCallback((presetId: 'terminal' | 'classic') => {
+    const preset = THEME_PRESETS[presetId]
+    applyTheme(preset, true)
+  }, [applyTheme])
+
   const resetToDefault = useCallback(() => {
     setTheme(DEFAULT_THEME)
     localStorage.removeItem(STORAGE_THEME)
@@ -168,6 +202,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       intensity,
       experimentalTheme,
       applyTheme,
+      applyPreset,
       resetToDefault,
       setLockTheme,
       setIntensity,
@@ -179,6 +214,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       intensity,
       experimentalTheme,
       applyTheme,
+      applyPreset,
       resetToDefault,
       setLockTheme,
       setIntensity,
